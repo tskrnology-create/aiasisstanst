@@ -1,27 +1,222 @@
 @import "tailwindcss";
 
+/* Class tabanlı koyu tema: tercih localStorage'da tutulur, varsayılan sistem tercihidir. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+
+  --canvas: #f5f5f9;
+  --canvas-2: #ecebf7;
+  --surface: #ffffff;
+  --surface-2: #f4f4f8;
+  --surface-3: #eaeaf1;
+  --line: #e3e3ec;
+  --line-strong: #d1d1de;
+
+  --ink: #101018;
+  --ink-soft: #34343f;
+  --muted: #6a6a79;
+  --faint: #9a9aa9;
+
+  --brand: #6a5cff;
+  --brand-strong: #5344e6;
+  --brand-ink: #ffffff;
+  --brand-soft: #ebe9ff;
+  --accent: #0d9488;
+
+  --ok: #0f8a5f;
+  --ok-soft: #ddf4e9;
+  --warn: #9a5b06;
+  --warn-soft: #fbf0d9;
+  --danger: #c93a3a;
+  --danger-soft: #fceaea;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --canvas: #07070c;
+  --canvas-2: #0e0e18;
+  --surface: #101017;
+  --surface-2: #16161f;
+  --surface-3: #1e1e29;
+  --line: #242430;
+  --line-strong: #34343f;
+
+  --ink: #ecebf3;
+  --ink-soft: #c9c7d6;
+  --muted: #94919f;
+  --faint: #6e6c7c;
+
+  --brand: #8d7cff;
+  --brand-strong: #a495ff;
+  --brand-ink: #0b0b12;
+  --brand-soft: #1c1934;
+  --accent: #2dd4bf;
+
+  --ok: #35d399;
+  --ok-soft: #10281f;
+  --warn: #fbbf24;
+  --warn-soft: #2a2113;
+  --danger: #f8717a;
+  --danger-soft: #2c1618;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  --color-canvas: var(--canvas);
+  --color-canvas-2: var(--canvas-2);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-accent: var(--accent);
+
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --radius-2xl: 1.125rem;
+  --radius-3xl: 1.5rem;
+
+  --shadow-soft: 0 1px 2px rgb(16 16 24 / 0.05), 0 16px 40px -22px rgb(16 16 24 / 0.22);
+  --shadow-pop: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 24px 60px -24px rgb(12 12 24 / 0.42);
+
+  --animate-rise: rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade: fade 0.25s ease-out both;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    /* Yumuşak arka plan ışıması: sabit, içerik akışını etkilemez. */
+    background-image:
+      radial-gradient(60rem 40rem at 100% -10%, color-mix(in oklab, var(--brand) 12%, transparent), transparent 70%),
+      radial-gradient(45rem 35rem at -10% 15%, color-mix(in oklab, var(--accent) 10%, transparent), transparent 70%);
+    background-attachment: fixed;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(60rem 40rem at 100% -10%, color-mix(in oklab, var(--brand) 22%, transparent), transparent 70%),
+      radial-gradient(45rem 35rem at -10% 15%, color-mix(in oklab, var(--accent) 14%, transparent), transparent 70%);
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.018em;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--brand) 26%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Native date/time renk seçicileri temaya uysun. */
+  input[type="color"] {
+    padding: 0;
+    border-radius: 0.625rem;
+  }
+
+  input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 3px;
+  }
+
+  input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 0.5rem;
+  }
+
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    color-scheme: inherit;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility text-gradient {
+  background-image: linear-gradient(100deg, var(--brand), var(--accent));
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }

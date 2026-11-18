@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { PLATFORM_LABELS, type SocialPlatform } from "@/lib/business-store";
 import { STATUS_LABEL, type ContentStatus } from "@/lib/library-utils";
+import { MANUAL_SHARE_NOTE, shareTarget } from "@/lib/share-links";
 import {
   REMINDER_LABEL,
   addDays,
@@ -26,18 +27,33 @@ import {
   type CalendarItem,
   type ReminderOption,
 } from "@/lib/calendar-utils";
+import {
+  Button,
+  Callout,
+  IconButton,
+  SectionCard,
+  Segmented,
+  StatusPill,
+  Tag,
+  cx,
+  hintClass,
+  inputClass,
+  selectClass,
+} from "./Ui";
+import { CopyButton, OpenPlatformButton } from "./ShareControls";
+import {
+  IconArrowLeft,
+  IconArrowRight,
+  IconCheck,
+  IconClock,
+  IconExternal,
+  IconPlus,
+  IconRefresh,
+  IconTrash,
+} from "./Icons";
 
 const SELECT_ITEM = "*, contents(prompt, tone, post_text, caption, hashtags, status)";
 const WEEKDAYS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
-
-const inputClass =
-  "w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 " +
-  "placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none dark:border-neutral-700 " +
-  "dark:bg-neutral-900 dark:text-neutral-100 dark:focus:border-neutral-300";
-
-const smallBtn =
-  "rounded-lg border border-neutral-300 px-3 py-1.5 text-sm hover:border-neutral-900 " +
-  "disabled:opacity-50 dark:border-neutral-700";
 
 interface PickerContent {
   id: string;
@@ -48,16 +64,6 @@ interface PickerContent {
 
 // PostgREST filtresinde milisaniyesiz ISO kullanılır.
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
-
-function StatusBadge({ status }: { status: ContentStatus }) {
-  const style =
-    status === "approved" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800";
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${style}`}>
-      {STATUS_LABEL[status]}
-    </span>
-  );
-}
 
 function ItemRow({
   item,
@@ -70,13 +76,14 @@ function ItemRow({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [when, setWhen] = useState(toLocalInput(new Date(item.scheduled_at)));
 
   const scheduled = new Date(item.scheduled_at);
   const overdue = isOverdue(item, new Date());
   const c = item.contents;
+  const target = shareTarget(item.platform);
+  const text = shareText(c);
 
   async function run(action: () => PromiseLike<{ error: { message: string } | null }>) {
     setBusy(true);
@@ -112,83 +119,118 @@ function ItemRow({
     if (ok) setEditing(false);
   }
 
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(shareText(c));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      setError("Panoya kopyalanamadı.");
-    }
-  }
-
   return (
     <li
-      className={`space-y-2 rounded-lg border p-3 ${
-        overdue
-          ? "border-red-300 bg-red-50 dark:bg-red-950/20"
-          : "border-neutral-200 dark:border-neutral-800"
-      } ${item.done ? "opacity-60" : ""}`}
+      className={cx(
+        "rounded-2xl border bg-surface p-4 shadow-soft transition",
+        overdue ? "border-danger/40" : "border-line",
+        item.done && "opacity-70"
+      )}
     >
-      <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
-        <span className="font-medium">
-          {showDate && `${scheduled.toLocaleDateString("tr-TR", { day: "numeric", month: "short" })} · `}
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs">
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface-2 px-2 py-1 font-mono text-[11px] font-medium text-ink-soft">
+          <IconClock className="h-3.5 w-3.5 text-muted" />
+          {showDate &&
+            `${scheduled.toLocaleDateString("tr-TR", { day: "numeric", month: "short" })} · `}
           {formatTime(item.scheduled_at)}
         </span>
-        <span>{item.platform ? PLATFORM_LABELS[item.platform] : "Platform seçilmedi"}</span>
-        {c && <StatusBadge status={c.status} />}
-        {item.done && <span className="text-green-700">Paylaşıldı</span>}
-        {overdue && <span className="font-medium text-red-700">Gecikmiş</span>}
+        {target ? (
+          <span className="inline-flex items-center gap-1.5 font-medium text-ink-soft">
+            <span
+              aria-hidden="true"
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: target.color }}
+            />
+            {target.label}
+          </span>
+        ) : (
+          <span className="font-medium text-faint">Platform seçilmedi</span>
+        )}
+        {c && <StatusPill status={c.status} />}
+        {item.done && (
+          <Tag tone="ok">
+            <IconCheck className="h-3 w-3" />
+            Paylaşıldı
+          </Tag>
+        )}
+        {overdue && <Tag tone="danger">Gecikmiş</Tag>}
       </div>
-      <p className="text-sm">{c ? c.post_text || c.prompt : "İçerik bulunamadı"}</p>
 
-      <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={busy} onClick={copy} className={smallBtn}>
-          {copied ? "Kopyalandı" : "Metni kopyala"}
-        </button>
-        <button
+      <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-ink">
+        {c ? c.post_text || c.prompt : "İçerik bulunamadı"}
+      </p>
+      {c && c.hashtags.length > 0 && (
+        <p className="mt-2 text-xs leading-relaxed text-brand dark:text-brand-strong">
+          {c.hashtags.join(" ")}
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-1.5">
+        <CopyButton text={text} label="Paylaşım metnini kopyala" />
+        <OpenPlatformButton platform={item.platform} />
+        <Button
           type="button"
+          variant={item.done ? "ghost" : "soft"}
+          size="sm"
           disabled={busy}
           onClick={() =>
             run(() =>
               getSupabase().from("calendar_items").update({ done: !item.done }).eq("id", item.id)
             )
           }
-          className={smallBtn}
         >
+          {item.done ? <IconRefresh /> : <IconCheck />}
           {item.done ? "Geri al" : "Paylaşıldı"}
-        </button>
-        <button type="button" disabled={busy} onClick={() => setEditing((e) => !e)} className={smallBtn}>
-          Saati değiştir
-        </button>
+        </Button>
+        <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setEditing((e) => !e)}>
+          <IconClock />
+          Saat
+        </Button>
+        {c && (
+          <Link
+            href={`/uret?prompt=${encodeURIComponent(c.prompt)}`}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted transition hover:bg-surface-2 hover:text-ink"
+          >
+            <IconExternal className="h-3.5 w-3.5" />
+            Yeniden üret
+          </Link>
+        )}
         <button
           type="button"
           disabled={busy}
+          aria-label="Plandan kaldır"
+          title="Plandan kaldır"
           onClick={() => {
             if (!window.confirm("Bu plan takvimden kaldırılsın mı? (İçerik kütüphanede kalır.)")) return;
             run(() => getSupabase().from("calendar_items").delete().eq("id", item.id));
           }}
-          className={smallBtn + " text-red-600"}
+          className="ml-auto grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:bg-danger-soft hover:text-danger disabled:opacity-50"
         >
-          Kaldır
+          <IconTrash />
         </button>
       </div>
 
       {editing && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface-2/70 p-2.5">
           <input
             type="datetime-local"
-            className={inputClass + " max-w-[16rem]"}
+            className={cx(inputClass, "w-auto min-w-[14rem] flex-1 py-2")}
             value={when}
             onChange={(e) => setWhen(e.target.value)}
             aria-label="Yeni tarih ve saat"
           />
-          <button type="button" disabled={busy} onClick={saveTime} className={smallBtn}>
+          <Button type="button" size="sm" disabled={busy} onClick={saveTime}>
             Kaydet
-          </button>
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+            Vazgeç
+          </Button>
         </div>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs font-medium text-danger">{error}</p>}
+      {target?.hint && (
+        <p className={cx(hintClass, "mt-2")}>{target.hint}</p>
+      )}
     </li>
   );
 }
@@ -242,69 +284,92 @@ function AddForm({
 
   if (contents.length === 0) {
     return (
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+      <Callout tone="warning">
         Takvime eklenecek içerik yok.{" "}
-        <Link href="/uret" className="font-medium underline underline-offset-4">
+        <Link href="/uret" className="font-semibold underline underline-offset-2">
           Önce içerik üretin →
         </Link>
-      </p>
+      </Callout>
     );
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3" noValidate>
-      <h3 className="text-sm font-semibold">Bu güne içerik ekle</h3>
-      <select
-        className={inputClass}
-        value={contentId}
-        onChange={(e) => setContentId(e.target.value)}
-        aria-label="İçerik"
-      >
-        <option value="">İçerik seçin…</option>
-        {contents.map((c) => (
-          <option key={c.id} value={c.id}>
-            [{STATUS_LABEL[c.status]}] {c.prompt.slice(0, 60)}
-            {c.tone ? ` · ${c.tone}` : ""}
-          </option>
-        ))}
-      </select>
-      <div className="flex flex-wrap gap-3">
+    <form onSubmit={submit} className="space-y-4" noValidate>
+      <div className="space-y-1.5">
+        <label htmlFor="cal-content" className="text-sm font-medium text-ink">
+          İçerik
+        </label>
         <select
-          className={inputClass + " max-w-[10rem]"}
-          value={platform}
-          onChange={(e) => setPlatform(e.target.value as SocialPlatform)}
-          aria-label="Platform"
+          id="cal-content"
+          className={selectClass}
+          value={contentId}
+          onChange={(e) => setContentId(e.target.value)}
         >
-          {Object.entries(PLATFORM_LABELS).map(([v, l]) => (
-            <option key={v} value={v}>
-              {l}
-            </option>
-          ))}
-        </select>
-        <input
-          type="time"
-          className={inputClass + " max-w-[8rem]"}
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-          aria-label="Saat"
-        />
-        <select
-          className={inputClass + " max-w-[12rem]"}
-          value={reminder}
-          onChange={(e) => setReminder(e.target.value as ReminderOption)}
-          aria-label="Hatırlatma"
-        >
-          {(Object.keys(REMINDER_LABEL) as ReminderOption[]).map((o) => (
-            <option key={o} value={o}>
-              {REMINDER_LABEL[o]}
+          <option value="">İçerik seçin…</option>
+          {contents.map((c) => (
+            <option key={c.id} value={c.id}>
+              [{STATUS_LABEL[c.status]}] {c.prompt.slice(0, 60)}
+              {c.tone ? ` · ${c.tone}` : ""}
             </option>
           ))}
         </select>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={busy} className={smallBtn}>
-        {busy ? "Ekleniyor…" : "Takvime ekle"}
-      </button>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="space-y-1.5">
+          <label htmlFor="cal-platform" className="text-sm font-medium text-ink">
+            Platform
+          </label>
+          <select
+            id="cal-platform"
+            className={selectClass}
+            value={platform}
+            onChange={(e) => setPlatform(e.target.value as SocialPlatform)}
+          >
+            {Object.entries(PLATFORM_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="cal-time" className="text-sm font-medium text-ink">
+            Saat
+          </label>
+          <input
+            id="cal-time"
+            type="time"
+            className={inputClass}
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="cal-reminder" className="text-sm font-medium text-ink">
+            Hatırlatma
+          </label>
+          <select
+            id="cal-reminder"
+            className={selectClass}
+            value={reminder}
+            onChange={(e) => setReminder(e.target.value as ReminderOption)}
+          >
+            {(Object.keys(REMINDER_LABEL) as ReminderOption[]).map((o) => (
+              <option key={o} value={o}>
+                {REMINDER_LABEL[o]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {error && <Callout tone="error">{error}</Callout>}
+
+      <Button type="submit" disabled={busy} className="w-full">
+        <IconPlus />
+        {busy ? "Ekleniyor…" : `${formatDayLong(day)} gününe ekle`}
+      </Button>
     </form>
   );
 }
@@ -402,16 +467,23 @@ export default function Calendar() {
     if (view === "month" && d.getMonth() !== cursor.getMonth()) setCursor(d);
   }
 
-  if (initialLoading) return <p className="text-sm text-neutral-500">Yükleniyor…</p>;
+  if (initialLoading) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-5 text-sm text-muted shadow-soft">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-line-strong border-t-brand" />
+        Takvim yükleniyor…
+      </div>
+    );
+  }
 
   if (!businessId) {
     return (
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+      <Callout tone="warning">
         Takvimi kullanmak için önce{" "}
-        <Link href="/" className="font-medium underline underline-offset-4">
+        <Link href="/" className="font-semibold underline underline-offset-2">
           işletme profilinizi kaydedin →
         </Link>
-      </p>
+      </Callout>
     );
   }
 
@@ -423,77 +495,75 @@ export default function Calendar() {
       : `${week[0].toLocaleDateString("tr-TR", { day: "numeric", month: "short" })} – ${week[6].toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" })}`;
 
   return (
-    <div className="space-y-8">
-      {error && (
-        <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</p>
-      )}
+    <div className="space-y-5">
+      {error && <Callout tone="error">{error}</Callout>}
 
       {attention.length > 0 && (
-        <section className="space-y-3" aria-label="Bugün ve gecikmiş">
-          <h2 className="text-lg font-semibold">Paylaşım bekleyenler</h2>
-          <p className="text-xs text-neutral-500">
-            Bugün paylaşılacaklar, gecikenler ve hatırlatma zamanı gelenler. Paylaştıktan sonra
-            &quot;Paylaşıldı&quot; düğmesine basın.
-          </p>
+        <SectionCard
+          step="Öncelik"
+          title="Paylaşım bekleyenler"
+          description="Bugün paylaşılacaklar, gecikenler ve hatırlatma zamanı gelenler."
+          aside={<Tag tone="danger">{attention.length} iş</Tag>}
+        >
           <ul className="space-y-3">
             {attention.map((item) => (
               <ItemRow key={item.id} item={item} showDate onChanged={reload} />
             ))}
           </ul>
-        </section>
+        </SectionCard>
       )}
 
-      <section className="space-y-4" aria-label="Takvim">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => move(-1)} className={smallBtn} aria-label="Önceki">
-              ←
-            </button>
-            <h2 className="min-w-[10rem] text-center text-base font-semibold capitalize">{title}</h2>
-            <button type="button" onClick={() => move(1)} className={smallBtn} aria-label="Sonraki">
-              →
-            </button>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setCursor(today);
-                setSelected(today);
-              }}
-              className={smallBtn}
-            >
-              Bugün
-            </button>
-            {(["month", "week"] as const).map((v) => (
-              <button
-                key={v}
+      <SectionCard
+        title={title}
+        description={view === "month" ? "Ay görünümü · Pazartesi ile başlar" : "Hafta görünümü"}
+        className="capitalize"
+        aside={
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <IconButton label="Önceki" onClick={() => move(-1)}>
+                <IconArrowLeft />
+              </IconButton>
+              <IconButton label="Sonraki" onClick={() => move(1)}>
+                <IconArrowRight />
+              </IconButton>
+              <Button
                 type="button"
-                onClick={() => setView(v)}
-                aria-pressed={view === v}
-                className={
-                  smallBtn + (view === v ? " bg-neutral-900 text-white dark:bg-white dark:text-neutral-900" : "")
-                }
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setCursor(today);
+                  setSelected(today);
+                }}
               >
-                {v === "month" ? "Ay" : "Hafta"}
-              </button>
-            ))}
+                Bugün
+              </Button>
+            </div>
+            <Segmented
+              ariaLabel="Görünüm"
+              value={view}
+              onChange={setView}
+              options={[
+                { value: "month", label: "Ay" },
+                { value: "week", label: "Hafta" },
+              ]}
+            />
           </div>
-        </div>
-
+        }
+      >
         {view === "month" ? (
           <div>
-            <div className="grid grid-cols-7 gap-1 text-center text-xs text-neutral-500">
+            <div className="grid grid-cols-7 gap-1 pb-2 text-center text-[11px] font-semibold uppercase tracking-wide text-faint">
               {WEEKDAYS.map((w) => (
                 <div key={w}>{w}</div>
               ))}
             </div>
-            <div className="mt-1 grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 gap-1">
               {grid.map((d) => {
                 const list = byDay.get(dayKey(d)) ?? [];
                 const inMonth = d.getMonth() === cursor.getMonth();
                 const isSel = sameDay(d, selected);
                 const hasOverdue = list.some((i) => isOverdue(i, new Date()));
+                const isToday = sameDay(d, today);
                 return (
                   <button
                     key={dayKey(d)}
@@ -501,46 +571,79 @@ export default function Calendar() {
                     onClick={() => selectDay(d)}
                     aria-label={`${formatDayLong(d)}, ${list.length} plan`}
                     aria-pressed={isSel}
-                    className={`flex h-14 flex-col items-center justify-start rounded-lg border p-1 text-sm ${
+                    className={cx(
+                      "flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border text-sm transition",
                       isSel
-                        ? "border-neutral-900 bg-neutral-100 dark:border-neutral-200 dark:bg-neutral-800"
-                        : "border-neutral-200 dark:border-neutral-800"
-                    } ${inMonth ? "" : "opacity-40"} ${sameDay(d, today) ? "font-bold ring-1 ring-neutral-500" : ""}`}
+                        ? "border-brand bg-brand text-brand-ink shadow-[0_10px_24px_-14px_var(--brand)]"
+                        : "border-transparent hover:border-line hover:bg-surface-2",
+                      !inMonth && !isSel && "opacity-35",
+                      isToday && !isSel && "border-line-strong font-bold"
+                    )}
                   >
                     <span>{d.getDate()}</span>
                     {list.length > 0 && (
-                      <span
-                        className={`mt-0.5 rounded-full px-1.5 text-[10px] font-medium ${
-                          hasOverdue ? "bg-red-600 text-white" : "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                        }`}
-                      >
-                        {list.length}
+                      <span className="flex items-center gap-0.5">
+                        {hasOverdue && (
+                          <span className={cx("h-1.5 w-1.5 rounded-full", isSel ? "bg-white" : "bg-danger")} />
+                        )}
+                        {list.slice(0, 3).map((i) => (
+                          <span
+                            key={i.id}
+                            className={cx(
+                              "h-1.5 w-1.5 rounded-full",
+                              isSel ? "bg-white/80" : i.done ? "bg-ok" : "bg-brand"
+                            )}
+                          />
+                        ))}
+                        {list.length > 3 && (
+                          <span className={cx("text-[9px] font-semibold", isSel ? "text-white/80" : "text-muted")}>
+                            +{list.length - 3}
+                          </span>
+                        )}
                       </span>
                     )}
                   </button>
                 );
               })}
             </div>
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line pt-3 text-[11px] text-muted">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand" /> Planlı
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-ok" /> Paylaşıldı
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-danger" /> Gecikmiş
+              </span>
+            </div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
             {week.map((d) => {
               const list = byDay.get(dayKey(d)) ?? [];
               return (
-                <div key={dayKey(d)} className="space-y-2">
+                <div
+                  key={dayKey(d)}
+                  className={cx(
+                    "space-y-2 rounded-xl border p-3",
+                    sameDay(d, selected) ? "border-brand bg-brand-soft/40" : "border-line bg-surface-2/40"
+                  )}
+                >
                   <button
                     type="button"
                     onClick={() => selectDay(d)}
                     aria-pressed={sameDay(d, selected)}
-                    className={`text-sm font-semibold capitalize ${sameDay(d, selected) ? "underline underline-offset-4" : ""}`}
+                    className="flex w-full items-center justify-between gap-2 text-left text-sm font-semibold capitalize text-ink"
                   >
                     {formatDayLong(d)}
-                    {sameDay(d, today) && " (bugün)"}
+                    {sameDay(d, today) && <Tag tone="brand">bugün</Tag>}
+                    {list.length > 0 && <span className="text-xs font-normal text-muted">{list.length} plan</span>}
                   </button>
                   {list.length === 0 ? (
-                    <p className="text-xs text-neutral-500">Plan yok.</p>
+                    <p className="text-xs text-faint">Plan yok.</p>
                   ) : (
-                    <ul className="space-y-3">
+                    <ul className="space-y-2">
                       {list.map((item) => (
                         <ItemRow key={item.id} item={item} onChanged={reload} />
                       ))}
@@ -551,33 +654,35 @@ export default function Calendar() {
             })}
           </div>
         )}
-      </section>
+      </SectionCard>
 
-      <section className="space-y-5 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800" aria-label="Seçili gün">
-        <h2 className="text-base font-semibold capitalize">{formatDayLong(selected)}</h2>
-        {view === "month" &&
-          (selectedItems.length === 0 ? (
-            <p className="text-sm text-neutral-600 dark:text-neutral-400">Bu gün için plan yok.</p>
-          ) : (
-            <ul className="space-y-3">
-              {selectedItems.map((item) => (
-                <ItemRow key={item.id} item={item} onChanged={reload} />
-              ))}
-            </ul>
-          ))}
-        <AddForm
-          key={dayKey(selected)}
-          day={selected}
-          businessId={businessId}
-          contents={contents}
-          onAdded={reload}
-        />
-      </section>
+      <div className="grid items-start gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+        <SectionCard
+          step="Seçili gün"
+          title={formatDayLong(selected)}
+          description={`${selectedItems.length} plan`}
+          className="capitalize"
+        >
+          {view === "month" &&
+            (selectedItems.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-line-strong p-6 text-center text-sm text-muted">
+                Bu gün için plan yok. Sağdaki formdan içerik ekleyin.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {selectedItems.map((item) => (
+                  <ItemRow key={item.id} item={item} onChanged={reload} />
+                ))}
+              </ul>
+            ))}
+        </SectionCard>
 
-      <p className="text-xs text-neutral-500">
-        Bu sürümde otomatik paylaşım yoktur: içeriği kopyalayıp ya da kütüphaneden indirip ilgili
-        platformda kendiniz paylaşırsınız. Hatırlatmalar bu sayfada görünür.
-      </p>
+        <SectionCard step="Planla" title="Bu güne içerik ekle">
+          <AddForm key={dayKey(selected)} day={selected} businessId={businessId} contents={contents} onAdded={reload} />
+        </SectionCard>
+      </div>
+
+      <Callout tone="info">{MANUAL_SHARE_NOTE}</Callout>
     </div>
   );
 }

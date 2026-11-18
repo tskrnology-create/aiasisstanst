@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
+import type { SocialPlatform } from "@/lib/business-store";
+import { shareText } from "@/lib/calendar-utils";
 import {
   STATUS_LABEL,
   contentToText,
@@ -12,17 +13,36 @@ import {
   type ContentRow,
   type ContentStatus,
 } from "@/lib/library-utils";
+import {
+  Button,
+  Callout,
+  EmptyState,
+  LinkButton,
+  SectionCard,
+  StatusPill,
+  Tag,
+  cx,
+  hintClass,
+  inputClass,
+} from "./Ui";
+import { CopyButton, OpenPlatformButton, PlatformPicker } from "./ShareControls";
+import {
+  IconArrowRight,
+  IconDownload,
+  IconLibrary,
+  IconRefresh,
+  IconSearch,
+  IconTrash,
+} from "./Icons";
 
 const PAGE_LIMIT = 200;
 
-const inputClass =
-  "w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 " +
-  "placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none dark:border-neutral-700 " +
-  "dark:bg-neutral-900 dark:text-neutral-100 dark:focus:border-neutral-300";
-
-const smallBtn =
-  "rounded-lg border border-neutral-300 px-3 py-1.5 text-sm hover:border-neutral-900 " +
-  "disabled:opacity-50 dark:border-neutral-700";
+const FILTERS: Array<{ value: "all" | ContentStatus; label: string }> = [
+  { value: "all", label: "Tümü" },
+  { value: "draft", label: "Taslak" },
+  { value: "approved", label: "Onaylı" },
+  { value: "archived", label: "Arşiv" },
+];
 
 function downloadText(row: ContentRow) {
   const blob = new Blob([contentToText(row)], { type: "text/plain;charset=utf-8" });
@@ -36,17 +56,27 @@ function downloadText(row: ContentRow) {
   URL.revokeObjectURL(url);
 }
 
-function StatusBadge({ status }: { status: ContentStatus }) {
-  const style =
-    status === "approved"
-      ? "bg-green-100 text-green-800"
-      : status === "archived"
-        ? "bg-neutral-200 text-neutral-700"
-        : "bg-amber-100 text-amber-800";
+function EditArea({
+  label,
+  value,
+  onChange,
+  rows = 3,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  rows?: number;
+}) {
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${style}`}>
-      {STATUS_LABEL[status]}
-    </span>
+    <label className="block space-y-1.5">
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-faint">{label}</span>
+      <textarea
+        className={cx(inputClass, "resize-y leading-relaxed")}
+        rows={rows}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
   );
 }
 
@@ -63,6 +93,7 @@ function ItemCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<SocialPlatform | null>(null);
   const [postText, setPostText] = useState(row.post_text ?? "");
   const [caption, setCaption] = useState(row.caption ?? "");
   const [hashtags, setHashtags] = useState(row.hashtags.join(" "));
@@ -117,80 +148,105 @@ function ItemCard({
   });
 
   return (
-    <article className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+    <article
+      className={cx(
+        "rounded-2xl border bg-surface shadow-soft transition hover:border-line-strong",
+        open ? "border-brand/40" : "border-line"
+      )}
+    >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full space-y-2 text-left"
         aria-expanded={open}
+        className="w-full space-y-2.5 rounded-2xl p-4 text-left sm:p-5"
       >
-        <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-          <StatusBadge status={row.status} />
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+          <StatusPill status={row.status} />
           <span>{date}</span>
-          <span>· {row.tone ? `Ton: ${row.tone}` : "Marka diline göre"}</span>
-          {row.parent_id && <span>· Alternatif</span>}
+          <span aria-hidden="true">·</span>
+          <span>{row.tone ? `Ton: ${row.tone}` : "Marka diline göre"}</span>
+          {row.parent_id && <Tag>Alternatif</Tag>}
+          <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-faint">
+            {open ? "Daralt" : "Düzenle ve paylaş"}
+            <IconArrowRight className={cx("h-3.5 w-3.5 transition", open && "rotate-90")} />
+          </span>
         </div>
-        <p className="text-sm font-medium">{row.prompt}</p>
-        {!open && row.post_text && (
-          <p className="line-clamp-2 text-sm text-neutral-600 dark:text-neutral-400">
-            {row.post_text}
-          </p>
-        )}
+        <p className="text-sm font-semibold text-ink">{row.prompt}</p>
+        <p className={cx("whitespace-pre-wrap text-sm leading-relaxed text-muted", !open && "line-clamp-2")}>
+          {row.post_text || row.caption || "Metin alanı boş."}
+        </p>
       </button>
 
       {open && (
-        <div className="mt-4 space-y-4">
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Gönderi metni</span>
-            <textarea className={inputClass} rows={3} value={postText} onChange={(e) => setPostText(e.target.value)} />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Açıklama (caption)</span>
-            <textarea className={inputClass} rows={4} value={caption} onChange={(e) => setCaption(e.target.value)} />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Hashtag&apos;ler</span>
-            <textarea className={inputClass} rows={2} value={hashtags} onChange={(e) => setHashtags(e.target.value)} />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Reklam metni</span>
-            <textarea className={inputClass} rows={3} value={adText} onChange={(e) => setAdText(e.target.value)} />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Hikâye (story) metni</span>
-            <textarea className={inputClass} rows={3} value={storyText} onChange={(e) => setStoryText(e.target.value)} />
-          </label>
+        <div className="space-y-5 border-t border-line p-4 sm:p-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <EditArea label="Gönderi metni" value={postText} onChange={setPostText} />
+            <EditArea label="Açıklama (caption)" value={caption} onChange={setCaption} rows={4} />
+            <EditArea label="Hashtag'ler" value={hashtags} onChange={setHashtags} rows={2} />
+            <EditArea label="Hikâye (story) metni" value={storyText} onChange={setStoryText} rows={2} />
+            <div className="sm:col-span-2">
+              <EditArea label="Reklam metni" value={adText} onChange={setAdText} />
+            </div>
+          </div>
 
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={() => save()} className={smallBtn}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" size="sm" disabled={busy} onClick={() => save()}>
               Kaydet
-            </button>
+            </Button>
             {row.status === "approved" ? (
-              <button type="button" disabled={busy} onClick={() => save("draft")} className={smallBtn}>
+              <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={() => save("draft")}>
                 Taslağa al
-              </button>
+              </Button>
             ) : (
-              <button type="button" disabled={busy} onClick={() => save("approved")} className={smallBtn}>
+              <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={() => save("approved")}>
                 Onayla
-              </button>
+              </Button>
             )}
-            <button type="button" onClick={() => downloadText(row)} className={smallBtn}>
-              İndir (.txt)
-            </button>
-            <Link href={`/uret?prompt=${encodeURIComponent(row.prompt)}`} className={smallBtn}>
-              Yeniden kullan
-            </Link>
+            {row.status !== "archived" && (
+              <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => save("archived")}>
+                Arşivle
+              </Button>
+            )}
+            <Button type="button" size="sm" variant="ghost" onClick={() => downloadText(row)}>
+              <IconDownload />İndir (.txt)
+            </Button>
+            <LinkButton href={`/uret?prompt=${encodeURIComponent(row.prompt)}`} size="sm" variant="ghost">
+              <IconRefresh />Yeniden kullan
+            </LinkButton>
             <button
               type="button"
               disabled={busy}
               onClick={remove}
-              className={smallBtn + " text-red-600"}
+              className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted transition hover:bg-danger-soft hover:text-danger disabled:opacity-50"
             >
+              <IconTrash className="h-3.5 w-3.5" />
               Sil
             </button>
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {notice && <p className="text-sm text-green-700">{notice}</p>}
+
+          <div className="space-y-3 rounded-xl border border-line bg-surface-2/60 p-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-faint">
+                Manuel paylaşım
+              </p>
+              <span className={hintClass}>Paylaşım metni: açıklama + hashtag</span>
+            </div>
+            <PlatformPicker value={platform} onChange={setPlatform} />
+            <div className="flex flex-wrap items-center gap-2">
+              <CopyButton text={shareText(row)} label="Paylaşım metnini kopyala" />
+              <OpenPlatformButton platform={platform} />
+              <CopyButton text={contentToText(row)} label="Tüm alanları kopyala" variant="ghost" />
+            </div>
+            {platform && (
+              <p className={hintClass}>
+                Metni kopyalayıp platformu açın; orada yapıştırıp paylaşın. Takvimden “Paylaşıldı”
+                işareti eklemeyi unutmayın.
+              </p>
+            )}
+          </div>
+
+          {error && <Callout tone="error">{error}</Callout>}
+          {notice && <Callout tone="success">{notice}</Callout>}
         </div>
       )}
     </article>
@@ -225,45 +281,75 @@ export default function Library() {
     [rows, query, statusFilter]
   );
 
-  if (loading) return <p className="text-sm text-neutral-500">Yükleniyor…</p>;
+  if (loading) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-5 text-sm text-muted shadow-soft">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-line-strong border-t-brand" />
+        Kütüphane yükleniyor…
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap gap-3">
-        <input
-          className={inputClass + " flex-1"}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="İçeriklerde ara…"
-          aria-label="Ara"
-        />
-        <select
-          className={inputClass + " max-w-[10rem]"}
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as "all" | ContentStatus)}
-          aria-label="Durum"
-        >
-          <option value="all">Tümü</option>
-          <option value="draft">Taslak</option>
-          <option value="approved">Onaylı</option>
-        </select>
-      </div>
+    <div className="space-y-5">
+      <SectionCard
+        title="Arşiviniz"
+        description={`${rows.length} içerik · ${visible.length} gösteriliyor`}
+        aside={
+          <LinkButton href="/uret" size="sm" variant="soft">
+            Yeni içerik üret
+          </LinkButton>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[14rem] flex-1">
+            <IconSearch className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+            <input
+              className={cx(inputClass, "pl-10")}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="İçeriklerde ara…"
+              aria-label="Ara"
+            />
+          </div>
+          <div className="no-scrollbar flex max-w-full gap-1 overflow-x-auto rounded-xl border border-line bg-surface-2 p-1">
+            {FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setStatusFilter(f.value)}
+                aria-pressed={statusFilter === f.value}
+                className={cx(
+                  "whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition",
+                  statusFilter === f.value
+                    ? "bg-surface text-ink shadow-[0_1px_2px_rgba(16,16,24,0.08)]"
+                    : "text-muted hover:text-ink"
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </SectionCard>
 
-      {error && (
-        <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</p>
-      )}
+      {error && <Callout tone="error">{error}</Callout>}
 
       {!error && rows.length === 0 && (
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          Henüz kayıtlı içeriğiniz yok.{" "}
-          <Link href="/uret" className="font-medium underline underline-offset-4">
-            İlk içeriğinizi üretin →
-          </Link>
-        </p>
+        <EmptyState
+          icon={<IconLibrary className="h-5 w-5" />}
+          title="Henüz kayıtlı içeriğiniz yok"
+          description="İlk içeriğinizi üretin; taslak olarak kütüphaneye otomatik kaydedilir."
+          action={
+            <LinkButton href="/uret" variant="primary" size="sm">
+              İlk içeriğinizi üretin
+            </LinkButton>
+          }
+        />
       )}
 
       {rows.length > 0 && visible.length === 0 && (
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">Aramanızla eşleşen içerik yok.</p>
+        <EmptyState title="Aramanızla eşleşen içerik yok" description="Filtreyi değiştirin veya farklı bir kelime arayın." />
       )}
 
       <div className="space-y-4">
@@ -278,9 +364,7 @@ export default function Library() {
       </div>
 
       {rows.length >= PAGE_LIMIT && (
-        <p className="text-xs text-neutral-500">
-          En yeni {PAGE_LIMIT} içerik gösteriliyor.
-        </p>
+        <p className={hintClass}>En yeni {PAGE_LIMIT} içerik gösteriliyor.</p>
       )}
     </div>
   );

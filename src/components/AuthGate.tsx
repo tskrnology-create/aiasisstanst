@@ -4,11 +4,8 @@ import { useEffect, useState } from "react";
 import { Fragment } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
-
-const inputClass =
-  "w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 " +
-  "placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none dark:border-neutral-700 " +
-  "dark:bg-neutral-900 dark:text-neutral-100 dark:focus:border-neutral-300";
+import { Button, Callout, Field, Segmented, cx, inputClass } from "./Ui";
+import { IconBuilding, IconSparkles, IconImage, IconCalendar } from "./Icons";
 
 function translateAuthError(message: string): string {
   const m = message.toLowerCase();
@@ -19,6 +16,12 @@ function translateAuthError(message: string): string {
   if (m.includes("rate limit")) return "Çok fazla deneme yapıldı, biraz bekleyip tekrar deneyin.";
   return "İşlem başarısız: " + message;
 }
+
+const HIGHLIGHTS = [
+  { icon: IconSparkles, title: "Markana uygun metin", text: "Gönderi, açıklama, hashtag, reklam ve hikâye." },
+  { icon: IconImage, title: "Satar görseller", text: "Marka rengin ve logonla hazır şablonlar." },
+  { icon: IconCalendar, title: "Planlı takvim", text: "Ne paylaşacağını önceden gör, gecikmeleri yakala." },
+];
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const configured = isSupabaseConfigured();
@@ -46,35 +49,29 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (!configured) {
     return (
-      <p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-        Supabase ayarları eksik. Vercel&apos;de NEXT_PUBLIC_SUPABASE_URL ve
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY değişkenlerini ekleyip yeniden
-        yayınlayın.
-      </p>
+      <Callout tone="warning">
+        <p className="font-semibold">Supabase ayarları eksik</p>
+        <p className="text-muted">
+          Vercel&apos;de <code className="font-mono text-xs">NEXT_PUBLIC_SUPABASE_URL</code> ve{" "}
+          <code className="font-mono text-xs">NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code>{" "}
+          değişkenlerini ekleyip yeniden yayınlayın.
+        </p>
+      </Callout>
     );
   }
 
   if (checking) {
-    return <p className="text-sm text-neutral-500">Yükleniyor…</p>;
-  }
-
-  if (session) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between text-sm text-neutral-600 dark:text-neutral-400">
-          <span>{session.user.email}</span>
-          <button
-            type="button"
-            onClick={() => getSupabase().auth.signOut()}
-            className="underline underline-offset-4 hover:text-red-600"
-          >
-            Çıkış yap
-          </button>
-        </div>
-        {/* key: kullanıcı değişince içerik sıfırdan yüklensin */}
-        <Fragment key={session.user.id}>{children}</Fragment>
+      <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-5 text-sm text-muted shadow-soft">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-line-strong border-t-brand" />
+        Yükleniyor…
       </div>
     );
+  }
+
+  // Oturum varsa çocuk içeriği çiz; hesap bilgisi kenar menüde gösterilir.
+  if (session) {
+    return <Fragment key={session.user.id}>{children}</Fragment>;
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -95,10 +92,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         });
         if (err) setError(translateAuthError(err.message));
       } else {
-        const { data, error: err } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-        });
+        const { data, error: err } = await supabase.auth.signUp({ email: email.trim(), password });
         if (err) {
           setError(translateAuthError(err.message));
         } else if (!data.session) {
@@ -114,48 +108,118 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4" noValidate>
-      <h2 className="text-lg font-semibold">
-        {mode === "login" ? "Giriş yap" : "Hesap oluştur"}
-      </h2>
-      <input
-        type="email"
-        autoComplete="email"
-        className={inputClass}
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="E-posta"
-      />
-      <input
-        type="password"
-        autoComplete={mode === "login" ? "current-password" : "new-password"}
-        className={inputClass}
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Şifre (en az 6 karakter)"
-      />
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {info && <p className="text-sm text-green-700">{info}</p>}
-      <button
-        type="submit"
-        disabled={busy}
-        className="w-full rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-60 dark:bg-white dark:text-neutral-900"
+    <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="relative overflow-hidden rounded-3xl border border-line bg-[linear-gradient(150deg,var(--brand-soft),var(--surface))] p-6 shadow-soft sm:p-8">
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[radial-gradient(circle,var(--brand),transparent_65%)] opacity-25"
+        />
+        <div className="relative space-y-6">
+          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1 text-[11px] font-semibold text-muted">
+            <IconBuilding className="h-3.5 w-3.5 text-brand dark:text-brand-strong" />
+            Tek panelde sosyal medya
+          </span>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold leading-tight text-ink sm:text-2xl">
+              Markanızın içeriğini{" "}
+              <span className="text-gradient">tek yerden</span> yönetin
+            </h2>
+            <p className="max-w-md text-sm leading-relaxed text-muted">
+              Profilinizi tanımlayın, yapay zekâyla içerik ve görsel hazırlayın, takviminizi kurun.
+              Paylaşımlar şimdilik manuel yapılır.
+            </p>
+          </div>
+          <ul className="space-y-3">
+            {HIGHLIGHTS.map((item) => (
+              <li key={item.title} className="flex items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-line bg-surface/80 text-brand dark:text-brand-strong">
+                  <item.icon />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-ink">{item.title}</span>
+                  <span className="block text-xs text-muted">{item.text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <form
+        onSubmit={onSubmit}
+        className="space-y-5 rounded-3xl border border-line bg-surface/90 p-6 shadow-soft backdrop-blur-sm sm:p-8"
+        noValidate
       >
-        {busy ? "Bekleyin…" : mode === "login" ? "Giriş yap" : "Kayıt ol"}
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setMode(mode === "login" ? "signup" : "login");
-          setError(null);
-          setInfo(null);
-        }}
-        className="text-sm underline underline-offset-4"
-      >
-        {mode === "login"
-          ? "Hesabınız yok mu? Kayıt olun"
-          : "Zaten hesabınız var mı? Giriş yapın"}
-      </button>
-    </form>
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-ink">
+            {mode === "login" ? "Hesabınıza girin" : "Yeni hesap oluşturun"}
+          </h3>
+          <Segmented
+            ariaLabel="İşlem seçimi"
+            className="w-full"
+            value={mode}
+            onChange={(next) => {
+              setMode(next);
+              setError(null);
+              setInfo(null);
+            }}
+            options={[
+              { value: "login", label: "Giriş yap" },
+              { value: "signup", label: "Kayıt ol" },
+            ]}
+          />
+        </div>
+
+        <Field label="E-posta" htmlFor="auth-email">
+          <input
+            id="auth-email"
+            type="email"
+            autoComplete="email"
+            className={inputClass}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="ornek@markaniz.com"
+          />
+        </Field>
+
+        <Field
+          label="Şifre"
+          htmlFor="auth-password"
+          hint="En az 6 karakter."
+        >
+          <input
+            id="auth-password"
+            type="password"
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            className={inputClass}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+          />
+        </Field>
+
+        {error && <Callout tone="error">{error}</Callout>}
+        {info && <Callout tone="success">{info}</Callout>}
+
+        <div className="space-y-3">
+          <Button type="submit" disabled={busy} className={cx("w-full")}>
+            {busy ? "Bekleyin…" : mode === "login" ? "Giriş yap" : "Kayıt ol"}
+          </Button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode(mode === "login" ? "signup" : "login");
+              setError(null);
+              setInfo(null);
+            }}
+            className="w-full text-center text-sm text-muted transition hover:text-ink"
+          >
+            {mode === "login"
+              ? "Hesabınız yok mu? Kayıt olun"
+              : "Zaten hesabınız var mı? Giriş yapın"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
