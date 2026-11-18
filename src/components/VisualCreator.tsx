@@ -15,8 +15,8 @@ import {
 } from "@/lib/visual-templates";
 import {
   DEFAULT_RATIO,
-  RATIOS,
-  RATIO_IDS,
+  MAX_PRIMARY_SHARE,
+  MIN_PRIMARY_SHARE,
   contrastText,
   percent,
   readPalette,
@@ -27,7 +27,6 @@ import {
   Callout,
   LinkButton,
   SectionCard,
-  Segmented,
   StatusPill,
   Tag,
   cx,
@@ -83,8 +82,9 @@ export default function VisualCreator() {
   const [subline, setSubline] = useState("");
   const [format, setFormat] = useState<FormatId>("post");
   const [template, setTemplate] = useState<TemplateId>("gradyan");
-  // Renk oranı kalıcı değil: tek görsel için seçilir, şablona ve isteme işlenir.
+  // Ana rengin yüzdesi 50–90 arasında tek tek ayarlanır; yardımcı renk kalandır.
   const [ratioId, setRatioId] = useState<RatioId>(DEFAULT_RATIO);
+  const [showStorySafeArea, setShowStorySafeArea] = useState(true);
   const [style, setStyle] = useState<Style>("photo");
 
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
@@ -271,11 +271,24 @@ export default function VisualCreator() {
             </p>
             <Tag tone="brand">{FORMATS[format].aspect}</Tag>
           </div>
-          <canvas
-            ref={canvasRef}
-            aria-label="Görsel önizleme"
-            className="mx-auto block h-auto w-full max-w-[19rem] rounded-xl border border-line shadow-soft"
-          />
+          <div className="relative mx-auto w-full max-w-[19rem]">
+            <canvas
+              ref={canvasRef}
+              aria-label="Görsel önizleme"
+              className="block h-auto w-full rounded-xl border border-line shadow-soft"
+            />
+            {format === "story" && showStorySafeArea && (
+              <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl" aria-hidden="true">
+                <div className="absolute inset-x-0 top-0 flex h-[14%] items-center justify-center border-b border-dashed border-white/80 bg-black/35 text-[9px] font-semibold uppercase tracking-wide text-white">
+                  Üst arayüz alanı
+                </div>
+                <div className="absolute inset-x-0 bottom-0 flex h-[15%] items-center justify-center border-t border-dashed border-white/80 bg-black/35 text-[9px] font-semibold uppercase tracking-wide text-white">
+                  Alt arayüz alanı
+                </div>
+                <div className="absolute inset-x-[7%] bottom-[17%] top-[16%] rounded-lg border border-dashed border-white/75" />
+              </div>
+            )}
+          </div>
           <div className="mt-4 space-y-3">
             <Button type="button" onClick={download} className="w-full">
               <IconDownload />
@@ -440,6 +453,9 @@ export default function VisualCreator() {
                   </option>
                 ))}
               </select>
+              <p className={hintClass}>
+                Bunlar indirme ölçüleridir; paylaşmadan önce hedef platformun güncel kırpma ve güvenli alanını kontrol edin.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -449,31 +465,76 @@ export default function VisualCreator() {
                   ana {percent(palette.share)} · yardımcı {percent(palette.accent)}
                 </span>
               </div>
-              <Segmented
-                ariaLabel="Renk oranı"
-                value={ratioId}
-                onChange={setRatioId}
-                options={RATIO_IDS.map((id) => ({ value: id, label: RATIOS[id].short }))}
-              />
+              <div className="rounded-xl border border-line bg-surface-2/70 px-3.5 py-3">
+                <label htmlFor="vis-ratio" className="sr-only">
+                  Ana renk kullanım oranı
+                </label>
+                <input
+                  id="vis-ratio"
+                  type="range"
+                  min={MIN_PRIMARY_SHARE}
+                  max={MAX_PRIMARY_SHARE}
+                  step={1}
+                  value={ratioId}
+                  onChange={(e) => setRatioId(Number(e.target.value))}
+                  aria-valuetext={`Ana renk yüzde ${ratioId}, yardımcı renk yüzde ${100 - ratioId}`}
+                  className="brand-ratio-slider w-full"
+                  style={{
+                    background: `linear-gradient(to right, ${palette.primary} 0%, ${palette.primary} ${ratioId}%, ${palette.secondary} ${ratioId}%, ${palette.secondary} 100%)`,
+                  }}
+                />
+                <div className="mt-1 flex justify-between text-[10px] font-mono text-muted">
+                  <span>%{MIN_PRIMARY_SHARE} / %{100 - MIN_PRIMARY_SHARE}</span>
+                  <span>%70 / %30</span>
+                  <span>%{MAX_PRIMARY_SHARE} / %{100 - MAX_PRIMARY_SHARE}</span>
+                </div>
+              </div>
               <p className={hintClass}>
-                {RATIOS[ratioId].hint} · Yardımcı renk yalnızca vurgu içindir; şablonlar ve yapay
-                zekâ arka plan istemi bu oranı kullanır.
+                Ana rengin payı %{ratioId}, yardımcı rengin payı %{100 - ratioId}. Her yüzde
+                adımında canlı önizleme ve yapay zekâ arka plan istemi güncellenir.
               </p>
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium text-ink">Şablon</p>
-              <Segmented
-                ariaLabel="Şablon"
-                value={template}
-                onChange={setTemplate}
-                options={TEMPLATES.map((t) => ({ value: t.id, label: t.label }))}
-              />
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-sm font-medium text-ink">Kompozisyon şablonu</p>
+                <span className="text-xs text-muted">{TEMPLATES.length} seçenek</span>
+              </div>
+              <div role="radiogroup" aria-label="Kompozisyon şablonu" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {TEMPLATES.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={template === item.id}
+                    onClick={() => setTemplate(item.id)}
+                    className={cx(
+                      "min-h-10 rounded-xl border px-3 py-2 text-left text-xs font-medium transition",
+                      template === item.id
+                        ? "border-brand bg-brand-soft text-brand dark:text-brand-strong"
+                        : "border-line bg-surface text-muted hover:border-line-strong hover:text-ink"
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
               {template === "fotograf" && !background && (
                 <p className={hintClass}>
-                  &quot;Fotoğraflı&quot; şablon için aşağıdan bir arka plan ekleyin; eklenene kadar
-                  gradyan gösterilir.
+                  &quot;Fotoğraflı&quot; temel şablon için aşağıdan arka plan ekleyin; yoksa gradyan
+                  yedek olarak gösterilir. Yeni kompozisyonlar yüklenen/üretilen fotoğrafın üstüne de uygulanabilir.
                 </p>
+              )}
+              {format === "story" && (
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-muted">
+                  <input
+                    type="checkbox"
+                    checked={showStorySafeArea}
+                    onChange={(e) => setShowStorySafeArea(e.target.checked)}
+                    className="h-4 w-4 accent-brand"
+                  />
+                  Hikâyede platform arayüzü için güvenli alanı göster (yalnızca önizleme)
+                </label>
               )}
             </div>
           </div>

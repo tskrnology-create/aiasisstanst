@@ -10,7 +10,7 @@ KOBİ'lerin ve markaların sosyal medya içeriklerini tek bir çalışma alanın
 |---|---|---|
 | İşletme / marka profili | `/` | İşletme adı, sektör, ürünler, hedef kitle, marka dili, **ana + yardımcı renk** (ikisi de zorunlu), logo, dil ve sosyal kullanıcı adları. Sosyal hesap kayıtları platform bağlantısı değildir. |
 | İçerik üretimi | `/uret` | Marka profiline göre gönderi, açıklama, hashtag, reklam ve hikâye metni; alternatif tonlar; kütüphaneye taslak olarak kaydetme. Gemini → DeepSeek → OpenAI yedek sırası. |
-| Görsel oluşturma | `/gorsel` | Metin/şablon tabanlı tasarım, marka renkleri/logo, **renk oranı seçimi** (%80/20 · %70/30 · %60/40), görsel arka plan yükleme veya Gemini ile üretme, PNG indirme. Görseller Supabase'e kaydedilmez. |
+| Görsel oluşturma | `/gorsel` | Metin/şablon tabanlı tasarım, marka renkleri/logo, **%50–90 arasında hassas renk oranı slider'ı**, 11 kompozisyon, altı çıktı biçimi (1:1, 9:16, 4:5, 16:9, 1.91:1, 2:3), fotoğraf üstüne marka şekilleri, hikâye güvenli alanı kılavuzu, görsel arka plan yükleme veya Gemini ile üretme, PNG indirme. Görseller Supabase'e kaydedilmez. |
 | İçerik takvimi | `/takvim` | Ay/hafta görünümü, içerik ve platform seçimi, hatırlatma zamanı, saat değiştirme ve manuel “paylaşıldı” takibi. Hatırlatma yalnızca uygulama içindedir; e-posta/push bildirimi yoktur. |
 | İçerik kütüphanesi | `/kutuphane` | Arama, durum filtresi, düzenleme, onay/taslak, metin indirme, silme ve içeriği yeniden kullanma. |
 | Hesap ve veri erişimi | Supabase Auth + RLS | E-posta/şifre oturumu ve işletme sahibine göre satır düzeyinde erişim politikaları. |
@@ -73,7 +73,7 @@ Supabase başlangıç SQL'leri:
 
 Markada tek bir **ana renk** ve tek bir **yardımcı renk** bulunur; profil ekranında ikisi de seçilmeden kayıt tamamlanamaz. Kural tek kaynakta, `src/lib/brand-palette.ts` içinde yaşar ve her üretim aynı paletten beslenir.
 
-Metin üretiminde marka promptu iki rengi rolleriyle (baskın ve vurgu) verir, oranı söyler ve üçüncü bir marka rengi uydurulmasını engeller. Görsel tarafında düz renk, gradyan, çerçeve, şerit ve fotoğraflı şablonlar alan paylaşımını seçilen orana göre çizer; yardımcı renk yalnızca band, çizgi, çerçeve veya ışık gibi vurgu alanında kalır. Yapay zekâ arka planı üretilirken isteme hem hex kodları hem kaplaması gereken yaklaşık oran yazılır; oran %80/20, %70/30 veya %60/40 olarak görsel stüdyosundan tek görsel için değiştirilebilir.
+Metin üretiminde marka promptu iki rengi rolleriyle (baskın ve vurgu) verir, oranı söyler ve üçüncü bir marka rengi uydurulmasını engeller. Görsel stüdyosunda ana renk payı %50–90 arasında birer puanla ayarlanır; yardımcı renk kalan payı alır. 11 şablon alan paylaşımını farklı kompozisyonlarla uygular ve fotoğraf varsa çoğu şablon şekilleri onun üzerine katmanlar. Kare, hikâye/dikey video, portre, yatay video/kapak, geniş yatay ve uzun dikey pin biçimleri seçilebilir. Yapay zekâ arka planı üretilirken isteme iki hex kodu ile aynı oran yazılır. Hikâye formatındaki güvenli alan çizgileri önizlemede rehberdir ve PNG'ye basılmaz. Formatlar dışa aktarım ölçüleridir; sosyal ağların güncel kırpma ve metin güvenli alanları yayın öncesinde ilgili uygulamada kontrol edilmelidir.
 
 Veritabanı şeması değişmez: `businesses.brand_colors` iki hex kodu saklar. Eski veya eksik kayıtlar migrasyon istemez — ilk iki renk okunur, tek renk varsa yardımcı renk ana renkten yaklaşık 3.4:1 kontrastla türetilir, hiç renk yoksa örnek çift kullanılır. Profil ekranı oranı ve yazı rengi tercihini canlı önizlemeyle gösterir, renkler birbirine çok yakınsa uyarı verir.
 

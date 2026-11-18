@@ -12,23 +12,23 @@ export const MAX_BRAND_COLORS = 2;
 export const FALLBACK_PRIMARY = "#1f2937";
 export const FALLBACK_SECONDARY = "#f59e0b";
 
-export type RatioId = "80-20" | "70-30" | "60-40";
+/** Ana rengin yüzdesi; yardımcı rengin payı her zaman 100 - share'dir. */
+export type RatioId = number;
 
-export const DEFAULT_RATIO: RatioId = "70-30";
+export const DEFAULT_RATIO = 70;
+export const MIN_PRIMARY_SHARE = 50;
+export const MAX_PRIMARY_SHARE = 90;
 
-export const RATIOS: Record<
-  RatioId,
-  { share: number; short: string; label: string; hint: string }
-> = {
-  "80-20": { share: 0.8, short: "%80 / %20", label: "Ana %80 · Yardımcı %20", hint: "Sakin ve kurumsal" },
-  "70-30": { share: 0.7, short: "%70 / %30", label: "Ana %70 · Yardımcı %30", hint: "Dengeli, varsayılan" },
-  "60-40": { share: 0.6, short: "%60 / %40", label: "Ana %60 · Yardımcı %40", hint: "Enerjik, kampanya" },
-};
+/** Slider/API için tam sayı yüzdeyi güvenli aralığa alır. */
+export function normalizeShare(value: unknown, fallback = DEFAULT_RATIO): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(MAX_PRIMARY_SHARE, Math.max(MIN_PRIMARY_SHARE, Math.round(parsed)));
+}
 
-export const RATIO_IDS = Object.keys(RATIOS) as RatioId[];
-
+/** API'den gelen kullanıcı kontrollü oranı kabul eder mi? */
 export function isRatioId(value: unknown): value is RatioId {
-  return typeof value === "string" && (RATIO_IDS as string[]).includes(value);
+  return typeof value === "number" && Number.isInteger(value) && value >= MIN_PRIMARY_SHARE && value <= MAX_PRIMARY_SHARE;
 }
 
 // ---------------------------------------------------------------- renk matematiği
@@ -192,13 +192,14 @@ export function readPalette(
   const primary = valid[0] ?? FALLBACK_PRIMARY;
   const secondaryFromStore = empty ? FALLBACK_SECONDARY : valid[1];
   const secondary = secondaryFromStore ?? suggestSecondary(primary);
-  const share = RATIOS[ratioId]?.share ?? RATIOS[DEFAULT_RATIO].share;
+  const normalizedRatio = normalizeShare(ratioId);
+  const share = normalizedRatio / 100;
   return {
     primary,
     secondary,
     onPrimary: contrastText(primary),
     onSecondary: contrastText(secondary),
-    ratioId,
+    ratioId: normalizedRatio,
     share,
     accent: 1 - share,
     derived: { secondary: !valid[1] },
