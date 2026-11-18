@@ -4,6 +4,7 @@
 
 import type { BusinessProfile } from "./brand-prompt";
 import { getSupabase } from "./supabase";
+import { isValidHex, normalizeHex, toStoredColors } from "./brand-palette";
 
 export type SocialPlatform =
   | "instagram"
@@ -58,7 +59,9 @@ export const businessStore: BusinessStore = {
       products: row.products ?? "",
       target_audience: row.target_audience ?? "",
       brand_voice: row.brand_voice ?? "",
-      brand_colors: row.brand_colors ?? [],
+      // [0] = ana renk, [1] = yardımcı renk. Eski kayıtlardaki 0, 1 veya 3+ renk
+      // readPalette içinde güvenle karşılanır; burada yalnızca ilk ikisi tutulur.
+      brand_colors: (row.brand_colors ?? []).slice(0, 2),
       content_language: row.content_language,
       logo_data_url: row.logo_url ?? null,
       social_accounts: (accounts ?? []) as SocialAccount[],
@@ -70,13 +73,19 @@ export const businessStore: BusinessStore = {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) throw new Error("Oturum bulunamadı, tekrar giriş yapın.");
 
+    // Kayıt her zaman tam iki renk içerir.
+    const storedColors = toStoredColors(
+      business.brand_colors?.[0] ?? "",
+      business.brand_colors?.[1] ?? ""
+    );
+
     const fields = {
       name: business.name,
       industry: business.industry,
       products: business.products || null,
       target_audience: business.target_audience || null,
       brand_voice: business.brand_voice || null,
-      brand_colors: business.brand_colors ?? [],
+      brand_colors: storedColors,
       content_language: business.content_language,
       logo_url: business.logo_data_url,
     };
@@ -130,6 +139,7 @@ export const EMPTY_BUSINESS: StoredBusiness = {
   products: "",
   target_audience: "",
   brand_voice: "",
+  // Boş başlangıç: kullanıcı ana + yardımcı renk seçmek zorundadır.
   brand_colors: [],
   content_language: "tr",
   logo_data_url: null,
@@ -146,8 +156,6 @@ export const PLATFORM_LABELS: Record<SocialPlatform, string> = {
   other: "Diğer",
 };
 
-const HEX_RE = /^#[0-9a-fA-F]{6}$/;
-
 export interface ValidationErrors {
   name?: string;
   industry?: string;
@@ -159,9 +167,22 @@ export function validateBusiness(b: StoredBusiness): ValidationErrors {
   const errors: ValidationErrors = {};
   if (!b.name.trim()) errors.name = "İşletme adı gerekli.";
   if (!b.industry.trim()) errors.industry = "Sektör gerekli.";
-  if ((b.brand_colors ?? []).some((c) => !HEX_RE.test(c))) {
-    errors.brand_colors = "Renkler #RRGGBB biçiminde olmalı.";
+
+  // Markada tam olarak iki renk olur: ana (baskın) ve yardımcı (vurgu).
+  const colors = b.brand_colors ?? [];
+  const rawPrimary = colors[0] ?? "";
+  const rawSecondary = colors[1] ?? "";
+  const primary = normalizeHex(rawPrimary);
+  const secondary = normalizeHex(rawSecondary);
+  if (!primary || !isValidHex(rawPrimary)) {
+    errors.brand_colors = "Ana renk gerekli (#RRGGBB biçiminde).";
+  } else if (!secondary || !isValidHex(rawSecondary)) {
+    errors.brand_colors =
+      "Yardımcı renk de gerekli (#RRGGBB). Görsellerdeki orantılı kullanım bu renkle kurulur.";
+  } else if (primary === secondary) {
+    errors.brand_colors = "Ana ve yardımcı renk aynı olamaz; vurgu görünmez hâle gelir.";
   }
+
   if (b.social_accounts.some((a) => !a.handle.trim())) {
     errors.social_accounts = "Boş hesap satırlarını doldurun veya silin.";
   }

@@ -8,11 +8,34 @@ import { STATUS_LABEL, type ContentRow } from "@/lib/library-utils";
 import {
   FORMATS,
   TEMPLATES,
+  TEMPLATE_USAGE,
   drawVisual,
-  resolvePalette,
   type FormatId,
   type TemplateId,
 } from "@/lib/visual-templates";
+import {
+  DEFAULT_RATIO,
+  RATIOS,
+  RATIO_IDS,
+  contrastText,
+  percent,
+  readPalette,
+  type RatioId,
+} from "@/lib/brand-palette";
+import {
+  Button,
+  Callout,
+  LinkButton,
+  SectionCard,
+  Segmented,
+  StatusPill,
+  Tag,
+  cx,
+  hintClass,
+  inputClass,
+  selectClass,
+} from "./Ui";
+import { IconDownload, IconImage, IconRefresh, IconSparkles, IconWand } from "./Icons";
 
 type TextSource = "post_text" | "ad_text" | "story_text" | "caption";
 type Style = "photo" | "illustration" | "abstract";
@@ -32,14 +55,6 @@ const STYLE_LABEL: Record<Style, string> = {
 const MAX_HEADLINE = 160;
 const MAX_SUBLINE = 120;
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
-
-const inputClass =
-  "w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 " +
-  "placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none dark:border-neutral-700 " +
-  "dark:bg-neutral-900 dark:text-neutral-100 dark:focus:border-neutral-300";
-const smallBtn =
-  "rounded-lg border border-neutral-300 px-3 py-1.5 text-sm hover:border-neutral-900 " +
-  "disabled:opacity-50 dark:border-neutral-700";
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -68,6 +83,8 @@ export default function VisualCreator() {
   const [subline, setSubline] = useState("");
   const [format, setFormat] = useState<FormatId>("post");
   const [template, setTemplate] = useState<TemplateId>("gradyan");
+  // Renk oranı kalıcı değil: tek görsel için seçilir, şablona ve isteme işlenir.
+  const [ratioId, setRatioId] = useState<RatioId>(DEFAULT_RATIO);
   const [style, setStyle] = useState<Style>("photo");
 
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
@@ -127,6 +144,7 @@ export default function VisualCreator() {
       subline,
       brandName: biz?.name ?? "",
       colors: biz?.brand_colors ?? [],
+      ratioId,
       logo: logo && biz?.logo_data_url ? logo : null,
       logoSize: logo ? { w: logo.naturalWidth, h: logo.naturalHeight } : undefined,
       background,
@@ -134,7 +152,7 @@ export default function VisualCreator() {
         ? { w: background.naturalWidth, h: background.naturalHeight }
         : undefined,
     });
-  }, [biz, logo, background, template, format, headline, subline, loading]);
+  }, [biz, logo, background, template, format, headline, subline, loading, ratioId]);
 
   const selected = contents.find((c) => c.id === contentId) ?? null;
 
@@ -160,7 +178,7 @@ export default function VisualCreator() {
       const res = await fetch("/api/image", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ topic: topic.slice(0, 300), style, format }),
+        body: JSON.stringify({ topic: topic.slice(0, 300), style, format, ratio: ratioId }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Görsel üretilemedi.");
@@ -220,203 +238,312 @@ export default function VisualCreator() {
     }, "image/png");
   }
 
-  if (loading) return <p className="text-sm text-neutral-500">Yükleniyor…</p>;
-
-  if (!biz) {
+  if (loading) {
     return (
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">
-        Görsel oluşturmak için önce{" "}
-        <Link href="/" className="font-medium underline underline-offset-4">
-          işletme profilinizi kaydedin →
-        </Link>
-      </p>
+      <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-5 text-sm text-muted shadow-soft">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-line-strong border-t-brand" />
+        Stüdyo yükleniyor…
+      </div>
     );
   }
 
-  const palette = resolvePalette(biz.brand_colors);
+  if (!biz) {
+    return (
+      <Callout tone="warning">
+        Görsel oluşturmak için önce{" "}
+        <Link href="/" className="font-semibold underline underline-offset-2">
+          işletme profilinizi kaydedin →
+        </Link>
+      </Callout>
+    );
+  }
+
+  const palette = readPalette(biz.brand_colors, ratioId);
 
   return (
-    <div className="space-y-8">
-      {loadError && (
-        <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">{loadError}</p>
-      )}
-
-      <section className="space-y-3">
-        <canvas
-          ref={canvasRef}
-          aria-label="Görsel önizleme"
-          className="mx-auto h-auto w-full max-w-md rounded-lg border border-neutral-200 dark:border-neutral-800"
-        />
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={download} className={smallBtn}>
-            PNG olarak indir
-          </button>
-          <span className="self-center text-xs text-neutral-500">
-            Marka renkleri:
-            <span className="ml-1 inline-flex gap-1 align-middle">
-              {[palette.primary, palette.secondary].map((c) => (
-                <span
-                  key={c}
-                  className="inline-block h-3.5 w-3.5 rounded-full border border-neutral-300"
-                  style={{ backgroundColor: c }}
-                  title={c}
-                />
-              ))}
-            </span>
-          </span>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">1. İçerik ve yazı</h2>
-        {contents.length === 0 ? (
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Henüz içeriğiniz yok.{" "}
-            <Link href="/uret" className="font-medium underline underline-offset-4">
-              Önce içerik üretin →
-            </Link>{" "}
-            Dilerseniz yazıyı aşağıya kendiniz de girebilirsiniz.
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-3">
-            <select
-              className={inputClass + " flex-1"}
-              value={contentId}
-              onChange={(e) => pickContent(e.target.value)}
-              aria-label="İçerik"
-            >
-              <option value="">İçerik seçin…</option>
-              {contents.map((c) => (
-                <option key={c.id} value={c.id}>
-                  [{STATUS_LABEL[c.status]}] {c.prompt.slice(0, 60)}
-                  {c.tone ? ` · ${c.tone}` : ""}
-                </option>
-              ))}
-            </select>
-            <select
-              className={inputClass + " max-w-[11rem]"}
-              value={source}
-              onChange={(e) => {
-                const s = e.target.value as TextSource;
-                setSource(s);
-                if (contentId) pickContent(contentId, s);
-              }}
-              aria-label="Yazı kaynağı"
-            >
-              {(Object.keys(SOURCE_LABEL) as TextSource[]).map((s) => (
-                <option key={s} value={s}>
-                  {SOURCE_LABEL[s]}
-                </option>
-              ))}
-            </select>
+    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+      {/* Önizleme */}
+      <div className="space-y-3 lg:sticky lg:top-6">
+        <div className="rounded-2xl border border-line bg-surface/90 p-4 shadow-soft backdrop-blur-sm">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">
+              Canlı önizleme
+            </p>
+            <Tag tone="brand">{FORMATS[format].aspect}</Tag>
           </div>
-        )}
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">Görseldeki yazı</span>
-          <textarea
-            className={inputClass}
-            rows={3}
-            maxLength={MAX_HEADLINE}
-            value={headline}
-            onChange={(e) => setHeadline(e.target.value)}
-            placeholder="Örn. Kasım'a özel %20 indirim"
+          <canvas
+            ref={canvasRef}
+            aria-label="Görsel önizleme"
+            className="mx-auto block h-auto w-full max-w-[19rem] rounded-xl border border-line shadow-soft"
           />
-        </label>
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">Alt yazı (isteğe bağlı)</span>
-          <input
-            className={inputClass}
-            maxLength={MAX_SUBLINE}
-            value={subline}
-            onChange={(e) => setSubline(e.target.value)}
-            placeholder="Örn. 30 Kasım'a kadar geçerli"
-          />
-        </label>
-      </section>
+          <div className="mt-4 space-y-3">
+            <Button type="button" onClick={download} className="w-full">
+              <IconDownload />
+              PNG olarak indir
+            </Button>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2 text-xs text-muted">
+                <span>Renk oranı</span>
+                <span className="font-mono">
+                  {percent(palette.share)} / {percent(palette.accent)}
+                </span>
+              </div>
+              <div className="flex h-8 overflow-hidden rounded-lg border border-line">
+                <span
+                  className="grid text-[10px] font-semibold"
+                  style={{
+                    width: `${palette.share * 100}%`,
+                    backgroundColor: palette.primary,
+                    color: contrastText(palette.primary),
+                  }}
+                >
+                  {palette.primary.toUpperCase()}
+                </span>
+                <span
+                  className="grid text-[10px] font-semibold"
+                  style={{
+                    width: `${palette.accent * 100}%`,
+                    backgroundColor: palette.secondary,
+                    color: contrastText(palette.secondary),
+                  }}
+                >
+                  {palette.secondary.toUpperCase()}
+                </span>
+              </div>
+              <p className={hintClass}>{TEMPLATE_USAGE[template]}</p>
+            </div>
+          </div>
+        </div>
+        {loadError && <Callout tone="error">{loadError}</Callout>}
+      </div>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">2. Format ve şablon</h2>
-        <select
-          className={inputClass}
-          value={format}
-          onChange={(e) => setFormat(e.target.value as FormatId)}
-          aria-label="Format"
+      {/* Kontroller */}
+      <div className="space-y-5">
+        <SectionCard
+          step="01"
+          title="İçerik ve yazı"
+          description="Kütüphanenizdeki bir içeriği temel alın veya yazıyı elle girin."
+          aside={
+            contents.length > 0 ? (
+              <LinkButton href="/uret" size="sm" variant="ghost">
+                <IconSparkles className="h-3.5 w-3.5" />
+                Yeni içerik
+              </LinkButton>
+            ) : undefined
+          }
         >
-          {(Object.keys(FORMATS) as FormatId[]).map((f) => (
-            <option key={f} value={f}>
-              {FORMATS[f].label}
-            </option>
-          ))}
-        </select>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Şablon">
-          {TEMPLATES.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              aria-pressed={template === t.id}
-              onClick={() => setTemplate(t.id)}
-              className={
-                smallBtn +
-                (template === t.id ? " bg-neutral-900 text-white dark:bg-white dark:text-neutral-900" : "")
-              }
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        {template === "fotograf" && !background && (
-          <p className="text-xs text-neutral-500">
-            &quot;Fotoğraflı&quot; şablon için aşağıdan bir arka plan ekleyin; eklenene kadar gradyan
-            gösterilir.
-          </p>
-        )}
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">3. Arka plan (isteğe bağlı)</h2>
-        <div className="flex flex-wrap items-center gap-3">
-          <select
-            className={inputClass + " max-w-[12rem]"}
-            value={style}
-            onChange={(e) => setStyle(e.target.value as Style)}
-            aria-label="Görsel stili"
-          >
-            {(Object.keys(STYLE_LABEL) as Style[]).map((s) => (
-              <option key={s} value={s}>
-                {STYLE_LABEL[s]}
-              </option>
-            ))}
-          </select>
-          <button type="button" disabled={busy} onClick={generateBackground} className={smallBtn}>
-            {busy ? "Üretiliyor…" : "Yapay zekâyla arka plan üret"}
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <label className={smallBtn + " cursor-pointer"}>
-            Fotoğraf yükle
-            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={onUpload} className="sr-only" />
-          </label>
-          {background && (
-            <button
-              type="button"
-              onClick={() => {
-                setBackground(null);
-                setNotice(null);
-              }}
-              className={smallBtn}
-            >
-              Arka planı kaldır
-            </button>
+          {contents.length === 0 ? (
+            <Callout tone="info">
+              Henüz içeriğiniz yok.{" "}
+              <Link href="/uret" className="font-semibold underline underline-offset-2">
+                Önce içerik üretin →
+              </Link>{" "}
+              Dilerseniz yazıyı aşağıya kendiniz de girebilirsiniz.
+            </Callout>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
+              <div className="space-y-1.5">
+                <label htmlFor="vis-content" className="text-sm font-medium text-ink">
+                  İçerik
+                </label>
+                <select
+                  id="vis-content"
+                  className={selectClass}
+                  value={contentId}
+                  onChange={(e) => pickContent(e.target.value)}
+                >
+                  <option value="">İçerik seçin…</option>
+                  {contents.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      [{STATUS_LABEL[c.status]}] {c.prompt.slice(0, 60)}
+                      {c.tone ? ` · ${c.tone}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="vis-source" className="text-sm font-medium text-ink">
+                  Yazı kaynağı
+                </label>
+                <select
+                  id="vis-source"
+                  className={selectClass}
+                  value={source}
+                  onChange={(e) => {
+                    const s = e.target.value as TextSource;
+                    setSource(s);
+                    if (contentId) pickContent(contentId, s);
+                  }}
+                >
+                  {(Object.keys(SOURCE_LABEL) as TextSource[]).map((s) => (
+                    <option key={s} value={s}>
+                      {SOURCE_LABEL[s]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           )}
-        </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {notice && <p className="text-sm text-green-700">{notice}</p>}
-        <p className="text-xs text-neutral-500">
-          Yapay zekâ yalnızca yazısız arka plan üretir; yazı, logo ve renkler şablonla eklenir. Üretilen
-          görseller, üretici tarafından görünmez bir işaretle (SynthID) etiketlenebilir. Arka plan ve
-          görsel şimdilik kaydedilmez, beğendiğiniz görseli indirin.
-        </p>
-      </section>
+
+          {selected && (
+            <div className="mt-3 flex items-center gap-2">
+              <StatusPill status={selected.status} />
+              <p className="truncate text-xs text-muted">{selected.prompt}</p>
+            </div>
+          )}
+
+          <div className="mt-5 space-y-4">
+            <label className="block space-y-1.5">
+              <span className="flex items-center justify-between text-sm font-medium text-ink">
+                Görseldeki yazı
+                <span className="font-mono text-[11px] text-faint">
+                  {headline.length}/{MAX_HEADLINE}
+                </span>
+              </span>
+              <textarea
+                className={cx(inputClass, "resize-y")}
+                rows={3}
+                maxLength={MAX_HEADLINE}
+                value={headline}
+                onChange={(e) => setHeadline(e.target.value)}
+                placeholder="Örn. Kasım'a özel %20 indirim"
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-ink">Alt yazı (isteğe bağlı)</span>
+              <input
+                className={inputClass}
+                maxLength={MAX_SUBLINE}
+                value={subline}
+                onChange={(e) => setSubline(e.target.value)}
+                placeholder="Örn. 30 Kasım'a kadar geçerli"
+              />
+            </label>
+          </div>
+        </SectionCard>
+
+        <SectionCard step="02" title="Format ve şablon" description="Yerleşim, marka renklerinizi ve logonuzu kullanır.">
+          <div className="space-y-5">
+            <div className="space-y-1.5">
+              <label htmlFor="vis-format" className="text-sm font-medium text-ink">
+                Format
+              </label>
+              <select
+                id="vis-format"
+                className={selectClass}
+                value={format}
+                onChange={(e) => setFormat(e.target.value as FormatId)}
+              >
+                {(Object.keys(FORMATS) as FormatId[]).map((f) => (
+                  <option key={f} value={f}>
+                    {FORMATS[f].label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm font-medium text-ink">Renk oranı</p>
+                <span className="text-xs text-muted">
+                  ana {percent(palette.share)} · yardımcı {percent(palette.accent)}
+                </span>
+              </div>
+              <Segmented
+                ariaLabel="Renk oranı"
+                value={ratioId}
+                onChange={setRatioId}
+                options={RATIO_IDS.map((id) => ({ value: id, label: RATIOS[id].short }))}
+              />
+              <p className={hintClass}>
+                {RATIOS[ratioId].hint} · Yardımcı renk yalnızca vurgu içindir; şablonlar ve yapay
+                zekâ arka plan istemi bu oranı kullanır.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-ink">Şablon</p>
+              <Segmented
+                ariaLabel="Şablon"
+                value={template}
+                onChange={setTemplate}
+                options={TEMPLATES.map((t) => ({ value: t.id, label: t.label }))}
+              />
+              {template === "fotograf" && !background && (
+                <p className={hintClass}>
+                  &quot;Fotoğraflı&quot; şablon için aşağıdan bir arka plan ekleyin; eklenene kadar
+                  gradyan gösterilir.
+                </p>
+              )}
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          step="03"
+          title="Arka plan"
+          description="Yapay zekâ yalnızca yazısız arka plan üretir; yazı, logo ve renkler şablonla çizilir."
+        >
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-end">
+              <div className="space-y-1.5">
+                <label htmlFor="vis-style" className="text-sm font-medium text-ink">
+                  Stil
+                </label>
+                <select
+                  id="vis-style"
+                  className={selectClass}
+                  value={style}
+                  onChange={(e) => setStyle(e.target.value as Style)}
+                >
+                  {(Object.keys(STYLE_LABEL) as Style[]).map((s) => (
+                    <option key={s} value={s}>
+                      {STYLE_LABEL[s]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" onClick={generateBackground} disabled={busy}>
+                  {busy ? <IconRefresh className="animate-spin" /> : <IconWand />}
+                  {busy ? "Üretiliyor…" : "Yapay zekâyla üret"}
+                </Button>
+                <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-line bg-surface px-4 text-sm font-medium text-ink transition hover:border-line-strong hover:bg-surface-2">
+                  <IconImage className="h-4 w-4 text-muted" />
+                  Fotoğraf yükle
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={onUpload}
+                    className="sr-only"
+                  />
+                </label>
+                {background && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setBackground(null);
+                      setNotice(null);
+                    }}
+                  >
+                    Kaldır
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {error && <Callout tone="error">{error}</Callout>}
+            {notice && <Callout tone="success">{notice}</Callout>}
+
+            <Callout tone="info">
+              Üretilen görseller, üretici tarafından görünmez bir işaretle (SynthID) etiketlenebilir.
+              Arka plan ve görsel şimdilik kaydedilmez; beğendiğiniz görseli indirin ve takvimdeki
+              paylaşım sırasında elle yükleyin.
+            </Callout>
+          </div>
+        </SectionCard>
+      </div>
     </div>
   );
 }

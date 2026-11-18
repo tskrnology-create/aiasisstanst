@@ -1,6 +1,20 @@
 // Görsel şablon motoru. Yazı, logo ve marka renkleri kodla çizilir (yapay zekâ
 // görsellerinde Türkçe karakterler ve logolar sık bozulduğu için); yapay zekâ
 // yalnızca yazısız arka plan üretir. Saf yardımcılar Node'da test edilebilir.
+//
+// Renk kuralı: markada tek ana + tek yardımcı renk vardır ve şablonlar bu iki
+// rengi `spec.share` oranında paylaşır (varsayılan %70 / %30). Yardımcı renk
+// asla zemini tamamen kaplamaz; band, çizgi, çerçeve veya ışık gibi vurgu
+// alanlarında kullanılır.
+
+import {
+  contrastText,
+  mix,
+  readPalette,
+  type BrandPalette,
+  type RatioId,
+  DEFAULT_RATIO,
+} from "./brand-palette";
 
 export type TemplateId = "duz" | "gradyan" | "cerceve" | "serit" | "fotograf";
 export type FormatId = "post" | "story" | "campaign";
@@ -13,6 +27,15 @@ export const TEMPLATES: Array<{ id: TemplateId; label: string }> = [
   { id: "fotograf", label: "Fotoğraflı" },
 ];
 
+/** Her şablonda yardımcı rengin hangi alana denk düştüğü (arayüzde gösterilir). */
+export const TEMPLATE_USAGE: Record<TemplateId, string> = {
+  duz: "Alt bant ve vurgu çizgisi yardımcı renkte; üstteki yazı alanı ana renkte kalır.",
+  gradyan: "Gradyanın başlangıcı ana renk, bitiş bölgesi yardımcı renk; geçiş oranı sizdeki payı izler.",
+  cerceve: "Çerçeve çizgisi ve üst başlık bandı yardımcı renk; zemin ana rengin çok açık tonu.",
+  serit: "Üst bant ana renk, sol dikey şerit ve başlık altı çizgi yardımcı renk.",
+  fotograf: "Fotoğrafın üst bölgesine ana renk tonu, başlık altına yardımcı renk çizgi bindirilir.",
+};
+
 export const FORMATS: Record<
   FormatId,
   { label: string; width: number; height: number; aspect: string }
@@ -22,71 +45,11 @@ export const FORMATS: Record<
   campaign: { label: "Kampanya görseli (4:5)", width: 1080, height: 1350, aspect: "4:5" },
 };
 
-const DEFAULT_COLORS = ["#1f2937", "#f59e0b"];
 const FONT = '"Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif';
 
-// ------------------------------------------------------------ renk yardımcıları
-
-export function normalizeHex(input: string): string | null {
-  const m = /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec((input ?? "").trim());
-  if (!m) return null;
-  let h = m[1].toLowerCase();
-  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
-  return "#" + h;
-}
-
-export function hexToRgb(hex: string): [number, number, number] {
-  const h = normalizeHex(hex) ?? "#000000";
-  return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-}
-
-// WCAG göreli parlaklık
-export function luminance(hex: string): number {
-  const [r, g, b] = hexToRgb(hex).map((v) => {
-    const c = v / 255;
-    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-// Zemin üzerinde daha okunaklı olan beyaz veya siyah
-export function contrastText(bg: string): "#ffffff" | "#111111" {
-  const l = luminance(bg);
-  const white = 1.05 / (l + 0.05);
-  const black = (l + 0.05) / (luminance("#111111") + 0.05);
-  return white >= black ? "#ffffff" : "#111111";
-}
-
-export function mix(a: string, b: string, t: number): string {
-  const x = hexToRgb(a);
-  const y = hexToRgb(b);
-  const c = x.map((v, i) => Math.round(v + (y[i] - v) * t));
-  return "#" + c.map((v) => v.toString(16).padStart(2, "0")).join("");
-}
-
-export interface Palette {
-  primary: string;
-  secondary: string;
-  onPrimary: string;
-  onSecondary: string;
-}
-
-export function resolvePalette(colors: string[] | undefined): Palette {
-  const valid = (colors ?? []).map(normalizeHex).filter((c): c is string => Boolean(c));
-  const primary = valid[0] ?? DEFAULT_COLORS[0];
-  let secondary = valid[1];
-  if (!secondary) {
-    secondary = valid[0]
-      ? mix(primary, contrastText(primary) === "#ffffff" ? "#ffffff" : "#000000", 0.35)
-      : DEFAULT_COLORS[1];
-  }
-  return {
-    primary,
-    secondary,
-    onPrimary: contrastText(primary),
-    onSecondary: contrastText(secondary),
-  };
-}
+// yeniden dışa aktarım: profil ve stüdyo tek yerden renk yardımı alsın
+export { normalizeHex, isValidHex } from "./brand-palette";
+export { contrastText, luminance, mix } from "./brand-palette";
 
 // ------------------------------------------------------------ yerleşim yardımcıları
 
@@ -184,7 +147,11 @@ export interface VisualSpec {
   headline: string;
   subline: string;
   brandName: string;
+  /** businesses.brand_colors: [ana renk, yardımcı renk] */
   colors: string[];
+  /** Ana rengin yüzey payı; RATIOS üzerinden gelir, varsayılan %70. */
+  share?: number;
+  ratioId?: RatioId;
   logo: CanvasImageSource | null;
   logoSize?: { w: number; h: number };
   background: CanvasImageSource | null;
@@ -196,6 +163,16 @@ interface Box {
   y: number;
   w: number;
   h: number;
+}
+
+function paletteOf(spec: VisualSpec): BrandPalette {
+  return readPalette(spec.colors, spec.ratioId ?? DEFAULT_RATIO);
+}
+
+// Oran, palette verilmişse ona yoksa spec.share'a göre ayarlanır.
+function sharesOf(spec: VisualSpec, p: BrandPalette) {
+  const share = spec.share ?? p.share;
+  return { share: Math.min(0.9, Math.max(0.5, share)), accent: 1 - Math.min(0.9, Math.max(0.5, share)) };
 }
 
 function drawTextBlock(
@@ -284,67 +261,107 @@ export function drawVisual(ctx: CanvasRenderingContext2D, spec: VisualSpec): voi
   const top = tall ? 250 : m;
   const bottom = tall ? 270 : m;
   const footerH = Math.round(W * 0.075);
-  const footerCenter = H - bottom - footerH / 2;
-  const p = resolvePalette(spec.colors);
+  const p = paletteOf(spec);
+  const { share, accent } = sharesOf(spec, p);
 
   let template = spec.template;
   const hasBg = Boolean(spec.background && spec.backgroundSize);
   if (template === "fotograf" && !hasBg) template = "gradyan"; // arka plan yoksa güvenli yedek
 
   ctx.clearRect(0, 0, W, H);
-  const textBottom = H - bottom - footerH - Math.round(W * 0.04);
 
   if (template === "duz") {
+    // Ana renk yüzeyin (1 - accent) kadarında: alt bant yardımcı renge ayrılır.
+    const bandH = Math.round(H * accent);
+    const bandY = H - bandH;
     ctx.fillStyle = p.primary;
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = p.secondary;
-    ctx.fillRect(m, top, Math.round(W * 0.14), 12);
-    drawTextBlock(ctx, spec, { x: m, y: top + 50, w: W - 2 * m, h: textBottom - top - 50 }, p.onPrimary, p.onPrimary, "middle");
-    drawBrand(ctx, spec, m, footerCenter, footerH, p.onPrimary);
+    ctx.fillRect(0, bandY, W, bandH);
+    const textBottom = bandY - Math.round(W * 0.05);
+    drawTextBlock(
+      ctx,
+      spec,
+      { x: m, y: top, w: W - 2 * m, h: Math.max(120, textBottom - top) },
+      p.onPrimary,
+      p.onPrimary,
+      "middle"
+    );
+    // Bant büyüdükçe yazı da büyür; genişliği aşmaması için üst sınır uygulanır.
+    drawBrand(ctx, spec, m, bandY + bandH / 2, Math.round(Math.min(bandH * 0.42, W * 0.05)), p.onSecondary);
     return;
   }
 
   if (template === "gradyan") {
+    // Geçiş durakları orana göre kaydırılır: diagonelin ~share kadarı ana renk.
     const g = ctx.createLinearGradient(0, 0, W, H);
     g.addColorStop(0, p.primary);
+    g.addColorStop(share * 0.75, mix(p.primary, p.secondary, 0.12));
+    g.addColorStop(share, mix(p.primary, p.secondary, 0.5));
+    g.addColorStop(Math.min(0.98, share + accent * 0.45), mix(p.primary, p.secondary, 0.88));
     g.addColorStop(1, p.secondary);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
-    const on = contrastText(mix(p.primary, p.secondary, 0.5));
+    const on = contrastText(mix(p.primary, p.secondary, share));
+    const textBottom = H - bottom - footerH - Math.round(W * 0.04);
     drawTextBlock(ctx, spec, { x: m, y: top, w: W - 2 * m, h: textBottom - top }, on, on, "middle");
-    drawBrand(ctx, spec, m, footerCenter, footerH, on);
+    // Yardımcı renk vurgu çizgisi: kalınlık oranla artar.
+    ctx.fillStyle = on;
+    ctx.globalAlpha = 0.25 + accent * 0.6;
+    ctx.fillRect(m, textBottom + Math.round(W * 0.02), Math.round(W * (0.14 + accent * 0.3)), Math.max(8, Math.round(W * accent * 0.02)));
+    ctx.globalAlpha = 1;
+    drawBrand(ctx, spec, m, H - bottom - footerH / 2, footerH, on);
     return;
   }
 
   if (template === "cerceve") {
-    ctx.fillStyle = "#faf8f4";
+    // Zemin ana rengin çok açık tonu; çerçeve ve başlık bandı yardımcı renk.
+    const paper = mix(p.primary, "#ffffff", 0.93);
+    ctx.fillStyle = paper;
     ctx.fillRect(0, 0, W, H);
+    const headerH = Math.round(H * accent * 0.42);
     ctx.fillStyle = p.secondary;
-    ctx.beginPath();
-    ctx.arc(W * 0.92, H * 0.08, W * 0.2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(0, 0, W, headerH);
     ctx.strokeStyle = p.primary;
-    ctx.lineWidth = Math.round(W * 0.012);
+    ctx.lineWidth = Math.max(4, Math.round(W * 0.016 * share));
     const inset = Math.round(W * 0.035);
     ctx.strokeRect(inset, inset, W - 2 * inset, H - 2 * inset);
-    drawTextBlock(ctx, spec, { x: m, y: top, w: W - 2 * m, h: textBottom - top }, "#1a1a1a", "#4b4b4b", "middle");
-    drawBrand(ctx, spec, m, footerCenter, footerH, "#1a1a1a");
+    drawBrand(ctx, spec, m, headerH / 2, Math.round(headerH * 0.5), p.onSecondary);
+    const textTop = headerH + m;
+    const textBottom = H - (tall ? bottom : m) - Math.round(W * 0.04);
+    drawTextBlock(
+      ctx,
+      spec,
+      { x: m, y: textTop, w: W - 2 * m, h: Math.max(120, textBottom - textTop) },
+      mix(p.primary, "#101010", 0.55),
+      "#4b4b4b",
+      "middle"
+    );
     return;
   }
 
   if (template === "serit") {
+    // Üst bant ana renk (payı share ile orantılı), dikey vurgu yardımcı renk.
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, W, H);
-    const bandH = tall ? 300 : Math.round(W * 0.17);
+    const bandH = tall ? Math.round(220 + 260 * share) : Math.round(H * share * 0.17);
     ctx.fillStyle = p.primary;
     ctx.fillRect(0, 0, W, bandH);
     const bandCenter = tall ? bandH - 90 : bandH / 2;
     drawBrand(ctx, spec, m, bandCenter, Math.round(W * 0.075), p.onPrimary);
     const textTop = bandH + m;
-    const textBottom2 = H - (tall ? bottom : m);
+    const textBottom = H - (tall ? bottom : m);
+    const barW = Math.max(10, Math.round(W * accent * 0.09));
     ctx.fillStyle = p.secondary;
-    ctx.fillRect(m, textTop, 14, textBottom2 - textTop);
-    drawTextBlock(ctx, spec, { x: m + 44, y: textTop, w: W - 2 * m - 44, h: textBottom2 - textTop }, "#111111", "#4b4b4b", "middle");
+    ctx.fillRect(m, textTop, barW, textBottom - textTop);
+    drawTextBlock(
+      ctx,
+      spec,
+      { x: m + barW + 30, y: textTop, w: W - 2 * m - barW - 30, h: textBottom - textTop },
+      "#111111",
+      "#4b4b4b",
+      "middle"
+    );
     return;
   }
 
@@ -359,17 +376,23 @@ export function drawVisual(ctx: CanvasRenderingContext2D, spec: VisualSpec): voi
   shade.addColorStop(1, "rgba(0,0,0,0.72)");
   ctx.fillStyle = shade;
   ctx.fillRect(0, 0, W, H);
+  // Ana renk tonu üst (geniş) bölgede, yardımcı renk dar vurgu bandında.
+  ctx.fillStyle = p.primary;
+  ctx.globalAlpha = 0.16 + share * 0.12;
+  ctx.fillRect(0, 0, W, Math.round(H * share * 0.55));
+  ctx.globalAlpha = 1;
+  const textBottomY = H - bottom - footerH - Math.round(W * 0.04);
   const textTopY = drawTextBlock(
     ctx,
     spec,
-    { x: m, y: textBottom - Math.round(H * 0.4), w: W - 2 * m, h: Math.round(H * 0.4) },
+    { x: m, y: textBottomY - Math.round(H * 0.4), w: W - 2 * m, h: Math.round(H * 0.4) },
     "#ffffff",
     "#f1f1f1",
     "bottom"
   );
   if (textTopY !== null) {
     ctx.fillStyle = p.secondary;
-    ctx.fillRect(m, textTopY - 36, Math.round(W * 0.14), 12);
+    ctx.fillRect(m, textTopY - 36, Math.round(W * (0.12 + accent * 0.34)), Math.max(8, Math.round(W * accent * 0.022)));
   }
-  drawBrand(ctx, spec, m, footerCenter, footerH, "#ffffff");
+  drawBrand(ctx, spec, m, H - bottom - footerH / 2, footerH, "#ffffff");
 }

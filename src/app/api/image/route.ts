@@ -4,6 +4,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { FORMATS, type FormatId } from "@/lib/visual-templates";
+import { DEFAULT_RATIO, isRatioId, readPalette, type RatioId } from "@/lib/brand-palette";
 import {
   buildImagePrompt,
   generateImage,
@@ -41,12 +42,14 @@ export async function POST(request: Request) {
   if (userError || !userData.user) return json({ error: "Oturum geçersiz, tekrar giriş yapın." }, 401);
 
   // 2) Girdi doğrulama
-  let body: { topic?: unknown; style?: unknown; format?: unknown };
+  let body: { topic?: unknown; style?: unknown; format?: unknown; ratio?: unknown };
   try {
     body = await request.json();
   } catch {
     return json({ error: "Geçersiz istek." }, 400);
   }
+  // Renk oranı: geçersiz veya eksikse tasarım varsayılanına düşer (%70 / %30).
+  const ratioId: RatioId = isRatioId(body.ratio) ? body.ratio : DEFAULT_RATIO;
   const topic = typeof body.topic === "string" ? body.topic.trim() : "";
   if (topic.length < 3) return json({ error: "Görsel için bir konu yazın." }, 400);
   if (topic.length > MAX_TOPIC_LEN) {
@@ -89,12 +92,13 @@ export async function POST(request: Request) {
   }
 
   // 5) Üretim
+  const palette = readPalette((biz.brand_colors ?? []) as string[], ratioId);
   const prompt = buildImagePrompt({
     businessName: biz.name,
     industry: biz.industry,
     topic,
     style: body.style,
-    colors: (biz.brand_colors ?? []) as string[],
+    palette,
   });
   const result = await generateImage(prompt, format.aspect);
   if (!result.ok) return json({ error: result.message }, 502);

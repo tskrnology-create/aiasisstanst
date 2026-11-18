@@ -3,6 +3,8 @@
 // hiçbir üretimde unutulmaz. OpenAI çağrısı bu dosyada YAPILMAZ,
 // sadece mesajlar hazırlanır (test etmesi kolay olsun diye).
 
+import { paletteRuleTr, paletteSummaryTr, readPalette } from "./brand-palette";
+
 export type ContentLanguage = "tr" | "en";
 
 export interface BusinessProfile {
@@ -11,6 +13,7 @@ export interface BusinessProfile {
   products?: string | null;
   target_audience?: string | null;
   brand_voice?: string | null;
+  /** [ana renk, yardımcı renk] — sıralama önemlidir. */
   brand_colors?: string[];
   content_language: ContentLanguage;
 }
@@ -39,6 +42,7 @@ const LANGUAGE_NAME: Record<ContentLanguage, string> = {
 
 export function buildBrandSystemPrompt(profile: BusinessProfile): string {
   const lang = LANGUAGE_NAME[profile.content_language];
+  const palette = readPalette(profile.brand_colors);
   return [
     `Sen "${clean(profile.name)}" işletmesi için çalışan bir sosyal medya içerik uzmanısın.`,
     ``,
@@ -47,11 +51,12 @@ export function buildBrandSystemPrompt(profile: BusinessProfile): string {
     `- Ürün ve hizmetler: ${clean(profile.products)}`,
     `- Hedef kitle: ${clean(profile.target_audience)}`,
     `- Marka dili: ${clean(profile.brand_voice)}`,
-    `- Marka renkleri: ${profile.brand_colors?.join(", ") || "belirtilmedi"}`,
+    `- Marka paleti: ${paletteSummaryTr(palette)}`,
     ``,
     `KURALLAR:`,
     `- Tüm içeriği ${lang} yaz.`,
     `- Marka diline ve hedef kitleye uy.`,
+    `- ${paletteRuleTr(palette)}`,
     `- Profilde olmayan ürün, fiyat, indirim oranı veya tarih uydurma; bilmediğin yerde [köşeli parantez] ile yer tutucu bırak.`,
     `- Yalnızca istenen JSON biçiminde yanıt ver.`,
   ].join("\n");

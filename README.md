@@ -1,70 +1,100 @@
-# AI Business Assistant — v1
+# Aı Asisst — Sosyal Medya İçerik Asistanı
 
-KOBİ'ler ve ajanslar için marka kimliğini bilen yapay zekâ içerik asistanı.
+KOBİ'lerin ve markaların sosyal medya içeriklerini tek bir çalışma alanında planlamasına, üretmesine ve yönetmesine yardımcı olan web uygulaması. Marka profili, yapay zekâ ile metin ve görsel hazırlama, içerik kütüphanesi ve manuel paylaşım takvimi MVP kapsamındadır.
+
+> **Ürün kapsamı:** Bu sürüm içerik üretimi ve planlamayı destekler; Instagram, TikTok veya diğer platformlara otomatik gönderi yayımlamaz. Profilde sosyal hesap kullanıcı adları saklanabilir, fakat OAuth/Platform API bağlantısı henüz yoktur.
+
+## Mevcut özellikler
+
+| Alan | Uygulama | Durum ve sınırlar |
+|---|---|---|
+| İşletme / marka profili | `/` | İşletme adı, sektör, ürünler, hedef kitle, marka dili, **ana + yardımcı renk** (ikisi de zorunlu), logo, dil ve sosyal kullanıcı adları. Sosyal hesap kayıtları platform bağlantısı değildir. |
+| İçerik üretimi | `/uret` | Marka profiline göre gönderi, açıklama, hashtag, reklam ve hikâye metni; alternatif tonlar; kütüphaneye taslak olarak kaydetme. Gemini → DeepSeek → OpenAI yedek sırası. |
+| Görsel oluşturma | `/gorsel` | Metin/şablon tabanlı tasarım, marka renkleri/logo, **renk oranı seçimi** (%80/20 · %70/30 · %60/40), görsel arka plan yükleme veya Gemini ile üretme, PNG indirme. Görseller Supabase'e kaydedilmez. |
+| İçerik takvimi | `/takvim` | Ay/hafta görünümü, içerik ve platform seçimi, hatırlatma zamanı, saat değiştirme ve manuel “paylaşıldı” takibi. Hatırlatma yalnızca uygulama içindedir; e-posta/push bildirimi yoktur. |
+| İçerik kütüphanesi | `/kutuphane` | Arama, durum filtresi, düzenleme, onay/taslak, metin indirme, silme ve içeriği yeniden kullanma. |
+| Hesap ve veri erişimi | Supabase Auth + RLS | E-posta/şifre oturumu ve işletme sahibine göre satır düzeyinde erişim politikaları. |
 
 ## Teknoloji
 
-- **Next.js** (arayüz + API route'ları)
-- **Supabase** (PostgreSQL, giriş, dosya depolama)
-- **OpenAI API** (metin üretimi)
-- Görsel üretimi için ayrı API (Modül 3'te seçilecek)
-- **GitHub** (sürüm kontrolü)
+- Next.js 16, React 19 ve TypeScript
+- Supabase: kimlik doğrulama ve PostgreSQL
+- Gemini, DeepSeek ve OpenAI: sunucu tarafı metin üretimi yedek zinciri
+- Gemini: isteğe bağlı görsel arka plan üretimi
+- GitHub: kaynak kodu ve sürüm kontrolü
 
-## v1 modülleri ve geliştirme sırası
+## Yerel kurulum
 
-1. **Business Profile** — `businesses`, `social_accounts`
-2. **AI Content Generator** — marka prompt katmanı (`brand-prompt.ts`) + `contents`
-3. **Content Library** — üretilen içeriği saklama, arama, düzenleme, indirme
-4. **Content Calendar** — `calendar_items`, taslak/onaylı durumu, hatırlatma
-5. **AI Visual Creator** — hazır şablonlar + görsel API (en belirsiz ve en maliyetli, sona bırakıldı)
+1. Node.js ve npm kurulu olmalıdır.
+2. Depoyu klonlayın ve bağımlılıkları yükleyin:
 
-## Dosyalar
+   ```bash
+   npm ci
+   ```
 
-| Dosya | Amaç |
-|---|---|
-| `schema.sql` | Tablolar, ilişkiler, RLS politikaları. Supabase SQL Editor'da çalıştırılır. |
-| `brand-prompt.ts` | İşletme profilini her üretim isteğine ekleyen fonksiyonlar ve model çıktısı doğrulaması. |
+3. `.env.example` dosyasını `.env.local` olarak kopyalayın; Supabase URL/publishable key ve kullanacağınız model sağlayıcı anahtarlarını ekleyin. `NEXT_PUBLIC_` değişkenleri tarayıcıya açık olacağından bunlara gizli anahtar koymayın.
+4. Supabase projesinde `schema.sql` dosyasını, ardından `schema_v2_image_usage.sql` dosyasını SQL Editor üzerinden çalıştırın.
+5. Geliştirme sunucusunu başlatın:
 
-## Güvenlik kuralları (canlıya çıkmadan önce zorunlu)
+   ```bash
+   npm run dev
+   ```
 
-- Tüm tablolarda RLS açık; her işletme yalnızca sahibine görünür. İki ayrı hesapla erişim testi yapılmadan yayına çıkılmaz.
-- OpenAI ve Supabase `service_role` anahtarları yalnızca sunucuda tutulur, tarayıcıya gönderilmez.
-- Kullanıcı girdisi prompt'a veri olarak girer (`clean()` fonksiyonu); model çıktısı kaydedilmeden önce doğrulanır.
-- Kullanıcı başına üretim limiti (rate limit) eklenir; aksi halde API maliyeti kontrolsüz artar.
-- AI ile yazılan her kod gözden geçirilip test edilmeden birleştirilmez.
+6. Kontroller:
 
-## Açık kararlar
+   ```bash
+   npm run lint
+   npm run build
+   ```
 
-- İlk müşteriler yalnızca Türkçe mi, iki dil mi? (Şema `tr`/`en` destekliyor; arayüz metinleri bu karara göre kurulacak.)
-- Görsel üretim API'si seçimi (Modül 3).
-- Ödeme altyapısı: ilk müşteriler ve pazar netleşince.
+Gerekli Supabase veya AI sağlayıcı anahtarları yoksa ilgili özellikler çalışmaz. `.env.local` dosyasını Git'e eklemeyin.
 
-## Sonraki adım
+## Yayın ortamı
 
-Next.js projesini oluşturmak, Supabase'e `schema.sql`'i yüklemek ve Business Profile formunu yazmak.
+Vercel için `.env.example` içindeki değişkenleri proje ayarlarına ekleyin. En azından Supabase URL ve publishable key ile bir metin sağlayıcı anahtarı gerekir. Görsel üretimi için Gemini anahtarı gerekir. `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `GEMINI_IMAGE_MODEL`, `DEEPSEEK_MODEL` ve `OPENAI_MODEL` isteğe bağlı model seçimleridir.
 
-## Güncel durum
+Supabase başlangıç SQL'leri:
 
-| Modül | Sayfa | Durum |
-|---|---|---|
-| Business Profile | `/` | Hazır (Supabase + e-posta/şifre girişi) |
-| AI Content Generator | `/uret` | Hazır (Gemini → DeepSeek → OpenAI sırasıyla yedekli) |
-| AI Visual Creator | `/gorsel` | Hazır: 5 şablon, 3 format, PNG indirme, yapay zekâ/yüklenen arka plan |
-| Content Calendar | `/takvim` | Hazır: ay/hafta görünümü, hatırlatma (sayfa içi), elle paylaşım |
-| Content Library | `/kutuphane` | Hazır: arama, düzenleme, onay, indirme, yeniden kullanma |
+1. `schema.sql`
+2. `schema_v2_image_usage.sql` (görsel üretim kullanım kaydı ve kotası)
 
-### Ortam değişkenleri (Vercel)
+Şema değişikliklerini canlı veritabanına uygulamadan önce yedek alın ve staging ortamında deneyin. İki farklı kullanıcıyla RLS izolasyonunu doğrulamadan canlıya çıkmayın.
 
-`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `GEMINI_API_KEY`
-(isteğe bağlı: `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `GEMINI_MODEL`, `GEMINI_IMAGE_MODEL`).
-Gizli anahtarlar `NEXT_PUBLIC_` ile başlamaz.
+## Güvenlik ve işletim notları
 
-### Veritabanı
+- Tarayıcıda yalnızca Supabase publishable/anon anahtarı kullanılır; `service_role` anahtarı veya AI sağlayıcı anahtarları istemciye konmamalıdır.
+- Veritabanı tablolarında RLS etkinleştirilmiştir. Gerçek güvenlik, Supabase SQL şemasının hedef projede doğru uygulanmasına bağlıdır.
+- Metin ve görsel üretim uçları oturum belirtecini doğrular, giriş uzunluğunu sınırlar ve saatlik kullanım kontrolü uygular.
+- Kota sınırları maliyet kontrolü için temel korumadır; canlı kullanımdan önce eşzamanlı istekler, sağlayıcı limitleri, kötüye kullanım ve maliyet alarmları ayrıca test edilmelidir.
+- Görsel üretimi için `schema_v2_image_usage.sql` uygulanmamışsa görsel endpoint'i kullanım sayacını okuyamaz ve istek başarısız olur.
+- Şifre sıfırlama, e-posta daveti, ekip/rol yönetimi, denetim kaydı ve hesap silme akışları bu MVP'de tamamlanmış ürün özellikleri olarak sunulmaz.
 
-1. `schema.sql` (ilk kurulum)
-2. `schema_v2_image_usage.sql` (görsel üretim limiti için; `/api/image` bunu gerektirir)
+## Marka paleti kuralı
 
-### Bilinçli olarak ertelenenler
+Markada tek bir **ana renk** ve tek bir **yardımcı renk** bulunur; profil ekranında ikisi de seçilmeden kayıt tamamlanamaz. Kural tek kaynakta, `src/lib/brand-palette.ts` içinde yaşar ve her üretim aynı paletten beslenir.
 
-Otomatik paylaşım, video üretimi, analiz, rakip analizi, reklam yönetimi, ekip yönetimi, CRM.
-Görseller şimdilik kaydedilmez (indirilir); Storage'a kaydetme sonraki aşama.
+Metin üretiminde marka promptu iki rengi rolleriyle (baskın ve vurgu) verir, oranı söyler ve üçüncü bir marka rengi uydurulmasını engeller. Görsel tarafında düz renk, gradyan, çerçeve, şerit ve fotoğraflı şablonlar alan paylaşımını seçilen orana göre çizer; yardımcı renk yalnızca band, çizgi, çerçeve veya ışık gibi vurgu alanında kalır. Yapay zekâ arka planı üretilirken isteme hem hex kodları hem kaplaması gereken yaklaşık oran yazılır; oran %80/20, %70/30 veya %60/40 olarak görsel stüdyosundan tek görsel için değiştirilebilir.
+
+Veritabanı şeması değişmez: `businesses.brand_colors` iki hex kodu saklar. Eski veya eksik kayıtlar migrasyon istemez — ilk iki renk okunur, tek renk varsa yardımcı renk ana renkten yaklaşık 3.4:1 kontrastla türetilir, hiç renk yoksa örnek çift kullanılır. Profil ekranı oranı ve yazı rengi tercihini canlı önizlemeyle gösterir, renkler birbirine çok yakınsa uyarı verir.
+
+## Ürün sınırları ve önerilen sonraki işler
+
+Aşağıdaki konular tamamlanmış özellik değildir; canlı ürün kapsamına göre planlanmalıdır:
+
+1. **Sosyal platform bağlantıları ve otomatik yayın:** Hedef platformları seçin; OAuth, gerekli izinler, token saklama/yenileme, API incelemesi ve platform kurallarını her biri için tasarlayın. Paylaşım öncesi kullanıcı onayı, başarısız gönderi ve yeniden deneme akışları ekleyin. Altı platformun resmî koşulları, ortak kuyruk mimarisi ve faz planı [`docs/platform-entegrasyon-plani.md`](docs/platform-entegrasyon-plani.md) dosyasındadır.
+2. **Birden fazla marka/işletme:** Şema kullanıcı başına birden fazla işletmeye izin verebilir; mevcut ekranlar çoğunlukla en eski işletmeyi seçer. Marka seçici ve her sayfada seçili işletme bağlamı eklenmeden ajans/çok markalı deneyim tamamlanmış sayılmaz.
+3. **Güvenilir kullanım kotaları:** Sunucu tarafında atomik kota/limit uygulaması ve üretim ortamında izleme ekleyin; istemci veya eşzamanlı isteklerle aşılabilecek sayaçlara tek başına güvenmeyin.
+4. **Test kapsamı:** Prompt/yanıt doğrulama, RLS sahiplik izolasyonu, oturum süresi dolması, rate limit ve Supabase hata senaryoları için otomatik testler ekleyin.
+5. **Bildirimler ve işbirliği:** Uygulama dışı hatırlatma (e-posta/push), ekip üyeleri, roller ve onay akışları ürün ihtiyacına göre eklenebilir.
+6. **Kalıcı medya ve operasyon:** Üretilen/yüklenen görseller için sahiplik politikaları olan Supabase Storage, saklama/silme politikası, gizlilik metni, yedekleme ve maliyet/hatta log izleme belirleyin.
+7. **Ürün sunum deneyimi:** Bu depo şu an oturum sonrası kullanılan ürün arayüzüdür; herkese açık tanıtım/plan/fiyat sayfaları ve ödeme altyapısı kapsamda değildir.
+
+## Depo yapısı
+
+- `src/app/`: sayfalar ve `/api/generate`, `/api/image` sunucu uçları
+- `src/components/`: uygulama kabuğu (`AppShell`), tasarım sistemi (`Ui`, `Icons`), profil, üretici, görsel, takvim, kütüphane ve paylaşım arayüzleri
+- `src/lib/`: Supabase erişimi, marka promptu, sağlayıcılar ve saf yardımcılar
+- `schema.sql`: temel tablolar, ilişkiler, tetikleyiciler ve RLS politikaları
+- `schema_v2_image_usage.sql`: görsel üretim kullanım kaydı
+- `.env.example`: beklenen ortam değişkenleri için örnek
+- `docs/platform-entegrasyon-plani.md`: platform API koşulları ve otomatik yayına geçiş planı
