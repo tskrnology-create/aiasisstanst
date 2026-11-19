@@ -42,7 +42,8 @@ export async function POST(request: Request) {
 
   const apiKey = process.env.PIXABAY_API_KEY?.trim();
   if (!apiKey) {
-    return json({ error: "Pixabay araması için sunucuya PIXABAY_API_KEY ortam değişkenini ekleyin." }, 503);
+    console.error("PIXABAY_API_KEY tanımlı değil");
+    return json({ error: "Stok fotoğraf şu an kullanılamıyor. Kendi fotoğrafınızı \"Yükle\" sekmesinden ekleyebilirsiniz." }, 503);
   }
 
   let body: { kind?: unknown; query?: unknown; page?: unknown };

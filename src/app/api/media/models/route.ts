@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     contentType: "model/gltf-binary",
     upsert: false,
   });
-  if (uploadError) return json({ error: "3D model özel depoya kaydedilemedi. schema_v4_media_library.sql migration'ını kontrol edin." }, 500);
+  if (uploadError) return json({ error: "3D model kaydedilemedi. Lütfen daha sonra tekrar deneyin." }, 500);
 
   const safeName = file.name.replace(/[\r\n\u0000-\u001f]/g, " ").slice(0, 200);
   const { data: row, error: insertError } = await supabase

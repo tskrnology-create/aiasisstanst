@@ -122,12 +122,12 @@ export default function MediaPicker({
         body: JSON.stringify({ kind: tab, query: term, page: nextPage }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error ?? "Pixabay araması başarısız oldu.");
+      if (!response.ok) throw new Error(data.error ?? "Arama yapılamadı, tekrar deneyin.");
       setResults((data.results ?? []) as SearchHit[]);
       setTotalHits(Number(data.totalHits ?? 0));
       setPage(nextPage);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Pixabay araması başarısız oldu.");
+      setError(cause instanceof Error ? cause.message : "Arama yapılamadı, tekrar deneyin.");
     } finally {
       setSearching(false);
     }
