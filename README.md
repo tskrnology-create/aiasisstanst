@@ -10,9 +10,9 @@ KOBİ'lerin ve markaların sosyal medya içeriklerini tek bir çalışma alanın
 |---|---|---|
 | İşletme / marka profili | `/` | İşletme adı, sektör, ürünler, hedef kitle, marka dili, **ana + yardımcı renk** (ikisi de zorunlu), logo, dil ve sosyal kullanıcı adları. Sosyal hesap kayıtları platform bağlantısı değildir. |
 | İçerik üretimi | `/uret` | Marka profiline göre gönderi, açıklama, hashtag, reklam ve hikâye metni; alternatif tonlar; kütüphaneye taslak olarak kaydetme. Gemini → DeepSeek → OpenAI yedek sırası. |
-| Görsel oluşturma | `/gorsel` | Metin/şablon tabanlı tasarım, marka renkleri/logo, **%50–90 arasında hassas renk oranı slider'ı**, 11 kompozisyon, altı çıktı biçimi (1:1, 9:16, 4:5, 16:9, 1.91:1, 2:3), fotoğraf üstüne marka şekilleri, hikâye güvenli alanı kılavuzu, görsel arka plan yükleme veya Gemini ile üretme, PNG indirme. Görseller Supabase'e kaydedilmez. |
+| Görsel oluşturma | `/gorsel` | Metin/şablon tabanlı tasarım, marka renkleri/logo, **%50–90 arasında hassas renk oranı slider'ı**, hızlı şablon araç çubuğu + ek stiller, altı çıktı biçimi (1:1, 9:16, 4:5, 16:9, 1.91:1, 2:3), fotoğraf üstüne marka şekilleri, hikâye güvenli alanı kılavuzu, arka plan yükleme veya Gemini ile üretme, PNG indirme ya da özel depoda kütüphaneye kaydetme. |
 | İçerik takvimi | `/takvim` | Ay/hafta görünümü, içerik ve platform seçimi, hatırlatma zamanı, saat değiştirme ve manuel “paylaşıldı” takibi. Hatırlatma yalnızca uygulama içindedir; e-posta/push bildirimi yoktur. |
-| İçerik kütüphanesi | `/kutuphane` | Arama, durum filtresi, düzenleme, onay/taslak, metin indirme, silme ve içeriği yeniden kullanma. |
+| İçerik kütüphanesi | `/kutuphane` | Arama, durum filtresi, düzenleme, onay/taslak, metin indirme, kaydedilmiş görselleri özel imzalı bağlantıyla görüntüleme, silme ve içeriği yeniden kullanma. |
 | Hesap ve veri erişimi | Supabase Auth + RLS | E-posta/şifre oturumu ve işletme sahibine göre satır düzeyinde erişim politikaları. |
 
 ## Teknoloji
@@ -33,7 +33,7 @@ KOBİ'lerin ve markaların sosyal medya içeriklerini tek bir çalışma alanın
    ```
 
 3. `.env.example` dosyasını `.env.local` olarak kopyalayın; Supabase URL/publishable key ve kullanacağınız model sağlayıcı anahtarlarını ekleyin. `NEXT_PUBLIC_` değişkenleri tarayıcıya açık olacağından bunlara gizli anahtar koymayın.
-4. Supabase projesinde `schema.sql` dosyasını, ardından `schema_v2_image_usage.sql` dosyasını SQL Editor üzerinden çalıştırın.
+4. Supabase projesinde sırasıyla `schema.sql`, `schema_v2_image_usage.sql` ve `schema_v3_visual_storage.sql` dosyalarını SQL Editor üzerinden çalıştırın.
 5. Geliştirme sunucusunu başlatın:
 
    ```bash
@@ -57,6 +57,7 @@ Supabase başlangıç SQL'leri:
 
 1. `schema.sql`
 2. `schema_v2_image_usage.sql` (görsel üretim kullanım kaydı ve kotası)
+3. `schema_v3_visual_storage.sql` (özel görsel deposu ve işletme sahibine göre Storage politikaları)
 
 Şema değişikliklerini canlı veritabanına uygulamadan önce yedek alın ve staging ortamında deneyin. İki farklı kullanıcıyla RLS izolasyonunu doğrulamadan canlıya çıkmayın.
 
@@ -67,6 +68,7 @@ Supabase başlangıç SQL'leri:
 - Metin ve görsel üretim uçları oturum belirtecini doğrular, giriş uzunluğunu sınırlar ve saatlik kullanım kontrolü uygular.
 - Kota sınırları maliyet kontrolü için temel korumadır; canlı kullanımdan önce eşzamanlı istekler, sağlayıcı limitleri, kötüye kullanım ve maliyet alarmları ayrıca test edilmelidir.
 - Görsel üretimi için `schema_v2_image_usage.sql` uygulanmamışsa görsel endpoint'i kullanım sayacını okuyamaz ve istek başarısız olur.
+- PNG tasarımlarını kütüphaneye kaydetmek için `schema_v3_visual_storage.sql` uygulanmalıdır. Bucket özeldir; yalnızca görselin yolundaki işletmenin sahibi dosyayı okuyabilir, yükleyebilir ve silebilir.
 - Şifre sıfırlama, e-posta daveti, ekip/rol yönetimi, denetim kaydı ve hesap silme akışları bu MVP'de tamamlanmış ürün özellikleri olarak sunulmaz.
 
 ## Marka paleti kuralı
@@ -86,7 +88,7 @@ Aşağıdaki konular tamamlanmış özellik değildir; canlı ürün kapsamına 
 3. **Güvenilir kullanım kotaları:** Sunucu tarafında atomik kota/limit uygulaması ve üretim ortamında izleme ekleyin; istemci veya eşzamanlı isteklerle aşılabilecek sayaçlara tek başına güvenmeyin.
 4. **Test kapsamı:** Prompt/yanıt doğrulama, RLS sahiplik izolasyonu, oturum süresi dolması, rate limit ve Supabase hata senaryoları için otomatik testler ekleyin.
 5. **Bildirimler ve işbirliği:** Uygulama dışı hatırlatma (e-posta/push), ekip üyeleri, roller ve onay akışları ürün ihtiyacına göre eklenebilir.
-6. **Kalıcı medya ve operasyon:** Üretilen/yüklenen görseller için sahiplik politikaları olan Supabase Storage, saklama/silme politikası, gizlilik metni, yedekleme ve maliyet/hatta log izleme belirleyin.
+6. **Medya operasyonu:** `schema_v3_visual_storage.sql` özel PNG bucket'ı ve işletme sahibine göre Storage erişimini kurar; kütüphaneden silinen kaydın görseli de temizlenir. Saklama süresi, gizlilik metni, yedekleme ve maliyet/log izlemeyi canlı ürün için belirleyin.
 7. **Ürün sunum deneyimi:** Bu depo şu an oturum sonrası kullanılan ürün arayüzüdür; herkese açık tanıtım/plan/fiyat sayfaları ve ödeme altyapısı kapsamda değildir.
 
 ## Depo yapısı
@@ -96,5 +98,6 @@ Aşağıdaki konular tamamlanmış özellik değildir; canlı ürün kapsamına 
 - `src/lib/`: Supabase erişimi, marka promptu, sağlayıcılar ve saf yardımcılar
 - `schema.sql`: temel tablolar, ilişkiler, tetikleyiciler ve RLS politikaları
 - `schema_v2_image_usage.sql`: görsel üretim kullanım kaydı
+- `schema_v3_visual_storage.sql`: özel PNG deposu ve RLS politikaları
 - `.env.example`: beklenen ortam değişkenleri için örnek
 - `docs/platform-entegrasyon-plani.md`: platform API koşulları ve otomatik yayına geçiş planı

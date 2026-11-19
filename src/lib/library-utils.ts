@@ -13,6 +13,7 @@ export interface ContentRow {
   hashtags: string[];
   ad_text: string | null;
   story_text: string | null;
+  visual_url: string | null;
   status: ContentStatus;
   created_at: string;
 }

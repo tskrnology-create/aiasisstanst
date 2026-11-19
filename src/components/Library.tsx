@@ -29,6 +29,7 @@ import { CopyButton, OpenPlatformButton, PlatformPicker } from "./ShareControls"
 import {
   IconArrowRight,
   IconDownload,
+  IconImage,
   IconLibrary,
   IconRefresh,
   IconSearch,
@@ -87,7 +88,7 @@ function ItemCard({
 }: {
   row: ContentRow;
   onUpdated: (row: ContentRow) => void;
-  onDeleted: (id: string) => void;
+  onDeleted: (id: string, warning?: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -99,6 +100,37 @@ function ItemCard({
   const [hashtags, setHashtags] = useState(row.hashtags.join(" "));
   const [adText, setAdText] = useState(row.ad_text ?? "");
   const [storyText, setStoryText] = useState(row.story_text ?? "");
+  const [visualResult, setVisualResult] = useState<{ key: string; src?: string; error?: string } | null>(null);
+  const visualSrc = visualResult?.key === row.visual_url ? visualResult.src ?? null : null;
+  const visualError = visualResult?.key === row.visual_url ? visualResult.error ?? null : null;
+  const visualLoading = Boolean(open && row.visual_url && visualResult?.key !== row.visual_url);
+
+  useEffect(() => {
+    let active = true;
+    if (!open || !row.visual_url) return () => { active = false; };
+    const key = row.visual_url;
+
+    if (/^(https?:|data:|blob:)/i.test(key)) {
+      Promise.resolve().then(() => {
+        if (active) setVisualResult({ key, src: key });
+      });
+      return () => { active = false; };
+    }
+
+    getSupabase().storage.from("visuals").createSignedUrl(key, 60 * 60)
+      .then(({ data, error: signedError }) => {
+        if (!active) return;
+        if (signedError || !data?.signedUrl) {
+          setVisualResult({ key, error: "Görsel açılamadı. visuals deposu ve erişim kurallarını kontrol edin." });
+        } else {
+          setVisualResult({ key, src: data.signedUrl });
+        }
+      })
+      .catch(() => {
+        if (active) setVisualResult({ key, error: "Görsel bağlantısı oluşturulamadı." });
+      });
+    return () => { active = false; };
+  }, [open, row.visual_url]);
 
   async function save(status: ContentStatus = row.status) {
     setBusy(true);
@@ -132,13 +164,20 @@ function ItemCard({
     if (!window.confirm("Bu içerik kalıcı olarak silinsin mi?")) return;
     setBusy(true);
     setError(null);
-    const { error: err } = await getSupabase().from("contents").delete().eq("id", row.id);
-    setBusy(false);
+    const supabase = getSupabase();
+    const { error: err } = await supabase.from("contents").delete().eq("id", row.id);
     if (err) {
+      setBusy(false);
       setError("Silinemedi: " + err.message);
       return;
     }
-    onDeleted(row.id);
+    let warning: string | undefined;
+    if (row.visual_url && !/^(https?:|data:|blob:)/i.test(row.visual_url)) {
+      const { error: storageError } = await supabase.storage.from("visuals").remove([row.visual_url]);
+      if (storageError) warning = "İçerik silindi ancak görsel dosyası depodan silinemedi; erişim politikasını kontrol edin.";
+    }
+    setBusy(false);
+    onDeleted(row.id, warning);
   }
 
   const date = new Date(row.created_at).toLocaleDateString("tr-TR", {
@@ -166,6 +205,7 @@ function ItemCard({
           <span aria-hidden="true">·</span>
           <span>{row.tone ? `Ton: ${row.tone}` : "Marka diline göre"}</span>
           {row.parent_id && <Tag>Alternatif</Tag>}
+          {row.visual_url && <Tag tone="brand"><IconImage className="h-3 w-3" />Görsel</Tag>}
           <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-faint">
             {open ? "Daralt" : "Düzenle ve paylaş"}
             <IconArrowRight className={cx("h-3.5 w-3.5 transition", open && "rotate-90")} />
@@ -179,6 +219,22 @@ function ItemCard({
 
       {open && (
         <div className="space-y-5 border-t border-line p-4 sm:p-5">
+          {row.visual_url && (
+            <div className="rounded-xl border border-line bg-surface-2/50 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-faint">Kaydedilmiş görsel</p>
+                {visualSrc && <a href={visualSrc} target="_blank" rel="noreferrer" className="text-xs font-medium text-brand hover:underline">Tam boy aç</a>}
+              </div>
+              {visualLoading ? (
+                <p className="text-xs text-muted">Görsel yükleniyor…</p>
+              ) : visualError ? (
+                <p className="text-xs text-danger">{visualError}</p>
+              ) : visualSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={visualSrc} alt={`${row.prompt} görsel tasarımı`} className="max-h-[32rem] w-full rounded-lg object-contain" />
+              ) : null}
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <EditArea label="Gönderi metni" value={postText} onChange={setPostText} />
             <EditArea label="Açıklama (caption)" value={caption} onChange={setCaption} rows={4} />
@@ -257,6 +313,7 @@ export default function Library() {
   const [rows, setRows] = useState<ContentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ message: string; tone: "success" | "warning" } | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ContentStatus>("all");
 
@@ -334,6 +391,7 @@ export default function Library() {
       </SectionCard>
 
       {error && <Callout tone="error">{error}</Callout>}
+      {notice && <Callout tone={notice.tone}>{notice.message}</Callout>}
 
       {!error && rows.length === 0 && (
         <EmptyState
@@ -358,7 +416,12 @@ export default function Library() {
             key={row.id}
             row={row}
             onUpdated={(u) => setRows((all) => all.map((r) => (r.id === u.id ? u : r)))}
-            onDeleted={(id) => setRows((all) => all.filter((r) => r.id !== id))}
+            onDeleted={(id, warning) => {
+              setRows((all) => all.filter((r) => r.id !== id));
+              setNotice(warning
+                ? { message: warning, tone: "warning" }
+                : { message: "İçerik kütüphaneden silindi.", tone: "success" });
+            }}
           />
         ))}
       </div>

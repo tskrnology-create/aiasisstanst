@@ -17,7 +17,6 @@ import {
   DEFAULT_RATIO,
   MAX_PRIMARY_SHARE,
   MIN_PRIMARY_SHARE,
-  contrastText,
   percent,
   readPalette,
   type RatioId,
@@ -25,8 +24,8 @@ import {
 import {
   Button,
   Callout,
+  Chip,
   LinkButton,
-  SectionCard,
   StatusPill,
   Tag,
   cx,
@@ -34,7 +33,7 @@ import {
   inputClass,
   selectClass,
 } from "./Ui";
-import { IconDownload, IconImage, IconRefresh, IconSparkles, IconWand } from "./Icons";
+import { IconDownload, IconImage, IconLibrary, IconRefresh, IconSparkles, IconWand } from "./Icons";
 
 type TextSource = "post_text" | "ad_text" | "story_text" | "caption";
 type Style = "photo" | "illustration" | "abstract";
@@ -50,6 +49,8 @@ const STYLE_LABEL: Record<Style, string> = {
   illustration: "İllüstrasyon",
   abstract: "Soyut / minimal",
 };
+
+const TOOLBAR_TEMPLATE_IDS: TemplateId[] = ["gradyan", "serit", "cerceve", "fotograf", "diyagonal", "editorial"];
 
 const MAX_HEADLINE = 160;
 const MAX_SUBLINE = 120;
@@ -90,6 +91,7 @@ export default function VisualCreator() {
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
   const [background, setBackground] = useState<HTMLImageElement | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -238,6 +240,62 @@ export default function VisualCreator() {
     }, "image/png");
   }
 
+  async function saveToLibrary() {
+    const canvas = canvasRef.current;
+    if (!canvas || !biz?.id) {
+      setError("Önce işletme profilinizi kaydedin, ardından görseli kütüphaneye ekleyin.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    let objectPath = "";
+    try {
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((result) => result ? resolve(result) : reject(new Error("PNG hazırlanamadı.")), "image/png");
+      });
+      const supabase = getSupabase();
+      objectPath = `${biz.id}/${crypto.randomUUID()}.png`;
+      const { error: uploadError } = await supabase.storage
+        .from("visuals")
+        .upload(objectPath, blob, { contentType: "image/png", upsert: false });
+      if (uploadError) {
+        throw new Error(`Görsel depoya yüklenemedi: ${uploadError.message}. Storage için schema_v3_visual_storage.sql dosyasının uygulanmış olduğunu kontrol edin.`);
+      }
+
+      const visualPrompt = selected
+        ? `Görsel tasarımı · ${selected.prompt}`
+        : `Görsel tasarımı · ${headline.trim() || "Marka içeriği"}`;
+      const { error: insertError } = await supabase.from("contents").insert({
+        business_id: biz.id,
+        parent_id: null,
+        prompt: visualPrompt.slice(0, 500),
+        tone: selected?.tone ?? null,
+        language: biz.content_language,
+        post_text: selected?.post_text || headline.trim() || null,
+        caption: selected?.caption || subline.trim() || null,
+        hashtags: selected?.hashtags ?? [],
+        ad_text: selected?.ad_text ?? null,
+        story_text: selected?.story_text ?? null,
+        visual_url: objectPath,
+        status: "draft",
+      });
+      if (insertError) {
+        const { error: cleanupError } = await supabase.storage.from("visuals").remove([objectPath]);
+        throw new Error(
+          cleanupError
+            ? `Kütüphane kaydı başarısız oldu (${insertError.message}); geçici görsel de silinemedi (${cleanupError.message}).`
+            : `Kütüphane kaydı başarısız oldu: ${insertError.message}`
+        );
+      }
+      setNotice("Görsel taslağı kütüphaneye kaydedildi.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Görsel kaydedilemedi.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-5 text-sm text-muted shadow-soft">
@@ -289,39 +347,27 @@ export default function VisualCreator() {
               </div>
             )}
           </div>
-          <div className="mt-4 space-y-3">
-            <Button type="button" onClick={download} className="w-full">
-              <IconDownload />
-              PNG olarak indir
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button type="button" onClick={saveToLibrary} disabled={saving || busy} className="w-full">
+              <IconLibrary />
+              {saving ? "Kaydediliyor…" : "Kütüphaneye ekle"}
             </Button>
+            <Button type="button" variant="secondary" onClick={download} disabled={saving || busy} className="w-full">
+              <IconDownload />PNG indir
+            </Button>
+          </div>
+          {error && <Callout tone="error" className="mt-3">{error}</Callout>}
+          {notice && <Callout tone="success" className="mt-3">{notice}</Callout>}
+          <div className="mt-3 space-y-2">
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2 text-xs text-muted">
-                <span>Renk oranı</span>
-                <span className="font-mono">
-                  {percent(palette.share)} / {percent(palette.accent)}
-                </span>
+                <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full" style={{ background: palette.primary }} />Ana</span>
+                <span className="font-mono">{percent(palette.share)} / {percent(palette.accent)}</span>
+                <span className="inline-flex items-center gap-1.5">Yardımcı<i className="h-2.5 w-2.5 rounded-full" style={{ background: palette.secondary }} /></span>
               </div>
-              <div className="flex h-8 overflow-hidden rounded-lg border border-line">
-                <span
-                  className="grid text-[10px] font-semibold"
-                  style={{
-                    width: `${palette.share * 100}%`,
-                    backgroundColor: palette.primary,
-                    color: contrastText(palette.primary),
-                  }}
-                >
-                  {palette.primary.toUpperCase()}
-                </span>
-                <span
-                  className="grid text-[10px] font-semibold"
-                  style={{
-                    width: `${palette.accent * 100}%`,
-                    backgroundColor: palette.secondary,
-                    color: contrastText(palette.secondary),
-                  }}
-                >
-                  {palette.secondary.toUpperCase()}
-                </span>
+              <div className="flex h-1.5 overflow-hidden rounded-full bg-surface-2">
+                <span style={{ width: `${palette.share * 100}%`, backgroundColor: palette.primary }} />
+                <span style={{ width: `${palette.accent * 100}%`, backgroundColor: palette.secondary }} />
               </div>
               <p className={hintClass}>{TEMPLATE_USAGE[template]}</p>
             </div>
@@ -331,20 +377,19 @@ export default function VisualCreator() {
       </div>
 
       {/* Kontroller */}
-      <div className="space-y-5">
-        <SectionCard
-          step="01"
-          title="İçerik ve yazı"
-          description="Kütüphanenizdeki bir içeriği temel alın veya yazıyı elle girin."
-          aside={
-            contents.length > 0 ? (
-              <LinkButton href="/uret" size="sm" variant="ghost">
-                <IconSparkles className="h-3.5 w-3.5" />
-                Yeni içerik
-              </LinkButton>
-            ) : undefined
-          }
-        >
+      <section className="rounded-2xl border border-line bg-surface/90 p-5 shadow-soft backdrop-blur-sm sm:p-6">
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold text-ink">Görselini hazırla</h2>
+            <p className="text-sm text-muted">Metni seç, görünümü düzenle ve tek tıkla kütüphanene kaydet.</p>
+          </div>
+          <LinkButton href="/uret" size="sm" variant="ghost">
+            <IconSparkles className="h-3.5 w-3.5" />Yeni içerik
+          </LinkButton>
+        </div>
+
+        <div className="space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-faint">İçerik</p>
           {contents.length === 0 ? (
             <Callout tone="info">
               Henüz içeriğiniz yok.{" "}
@@ -433,9 +478,13 @@ export default function VisualCreator() {
               />
             </label>
           </div>
-        </SectionCard>
+        </div>
 
-        <SectionCard step="02" title="Format ve şablon" description="Yerleşim, marka renklerinizi ve logonuzu kullanır.">
+        <div className="space-y-5 border-t border-line pt-5">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">Görünüm</h3>
+            <p className="mt-1 text-xs text-muted">Şablon, format ve marka rengi dengesini ayarlayın.</p>
+          </div>
           <div className="space-y-5">
             <div className="space-y-1.5">
               <label htmlFor="vis-format" className="text-sm font-medium text-ink">
@@ -458,17 +507,31 @@ export default function VisualCreator() {
               </p>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-sm font-medium text-ink">Renk oranı</p>
-                <span className="text-xs text-muted">
-                  ana {percent(palette.share)} · yardımcı {percent(palette.accent)}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium text-ink">Marka rengi dengesi</p>
+                <span className="rounded-full bg-surface-2 px-2.5 py-1 font-mono text-xs font-semibold text-ink">
+                  %{ratioId} <span className="text-faint">/</span> %{100 - ratioId}
                 </span>
               </div>
-              <div className="rounded-xl border border-line bg-surface-2/70 px-3.5 py-3">
-                <label htmlFor="vis-ratio" className="sr-only">
-                  Ana renk kullanım oranı
-                </label>
+              <div className="rounded-2xl border border-line bg-surface-2/60 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="h-8 w-8 shrink-0 rounded-xl border border-white/70 shadow-sm" style={{ backgroundColor: palette.primary }} />
+                    <span className="min-w-0">
+                      <span className="block text-[11px] font-medium text-muted">Ana renk</span>
+                      <span className="block font-mono text-xs font-semibold text-ink">%{ratioId}</span>
+                    </span>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-2.5 text-right">
+                    <span className="min-w-0">
+                      <span className="block text-[11px] font-medium text-muted">Yardımcı</span>
+                      <span className="block font-mono text-xs font-semibold text-ink">%{100 - ratioId}</span>
+                    </span>
+                    <span className="h-8 w-8 shrink-0 rounded-xl border border-white/70 shadow-sm" style={{ backgroundColor: palette.secondary }} />
+                  </div>
+                </div>
+                <label htmlFor="vis-ratio" className="sr-only">Ana rengin kullanım oranı</label>
                 <input
                   id="vis-ratio"
                   type="range"
@@ -483,42 +546,32 @@ export default function VisualCreator() {
                     background: `linear-gradient(to right, ${palette.primary} 0%, ${palette.primary} ${ratioId}%, ${palette.secondary} ${ratioId}%, ${palette.secondary} 100%)`,
                   }}
                 />
-                <div className="mt-1 flex justify-between text-[10px] font-mono text-muted">
-                  <span>%{MIN_PRIMARY_SHARE} / %{100 - MIN_PRIMARY_SHARE}</span>
-                  <span>%70 / %30</span>
-                  <span>%{MAX_PRIMARY_SHARE} / %{100 - MAX_PRIMARY_SHARE}</span>
+                <div className="mt-2 flex items-center justify-between text-[10px] font-medium text-muted">
+                  <span>50 / 50</span><span>Her adım %1</span><span>90 / 10</span>
                 </div>
               </div>
-              <p className={hintClass}>
-                Ana rengin payı %{ratioId}, yardımcı rengin payı %{100 - ratioId}. Her yüzde
-                adımında canlı önizleme ve yapay zekâ arka plan istemi güncellenir.
-              </p>
+              <p className={hintClass}>Kaydırdıkça önizleme ve AI arka plan paleti anında güncellenir.</p>
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-baseline justify-between gap-2">
-                <p className="text-sm font-medium text-ink">Kompozisyon şablonu</p>
-                <span className="text-xs text-muted">{TEMPLATES.length} seçenek</span>
+              <p className="text-sm font-medium text-ink">Şablon araç çubuğu</p>
+              <div role="group" aria-label="Görsel stili" className="flex flex-wrap gap-2">
+                {TOOLBAR_TEMPLATE_IDS.map((id) => {
+                  const item = TEMPLATES.find((entry) => entry.id === id);
+                  if (!item) return null;
+                  return <Chip key={id} active={template === id} onClick={() => setTemplate(id)}>{item.label}</Chip>;
+                })}
               </div>
-              <div role="radiogroup" aria-label="Kompozisyon şablonu" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {TEMPLATES.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={template === item.id}
-                    onClick={() => setTemplate(item.id)}
-                    className={cx(
-                      "min-h-10 rounded-xl border px-3 py-2 text-left text-xs font-medium transition",
-                      template === item.id
-                        ? "border-brand bg-brand-soft text-brand dark:text-brand-strong"
-                        : "border-line bg-surface text-muted hover:border-line-strong hover:text-ink"
-                    )}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
+              <details className="group rounded-xl border border-line bg-surface-2/50 px-3.5 py-2.5">
+                <summary className="cursor-pointer list-none text-xs font-semibold text-muted marker:hidden">
+                  <span className="inline-flex items-center gap-2">Diğer şablonlar <span className="rounded-full bg-surface px-2 py-0.5 font-mono">{TEMPLATES.length - TOOLBAR_TEMPLATE_IDS.length}</span><span className="text-faint transition group-open:rotate-90">›</span></span>
+                </summary>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {TEMPLATES.filter((item) => !TOOLBAR_TEMPLATE_IDS.includes(item.id)).map((item) => (
+                    <Chip key={item.id} active={template === item.id} onClick={() => setTemplate(item.id)}>{item.label}</Chip>
+                  ))}
+                </div>
+              </details>
               {template === "fotograf" && !background && (
                 <p className={hintClass}>
                   &quot;Fotoğraflı&quot; temel şablon için aşağıdan arka plan ekleyin; yoksa gradyan
@@ -538,13 +591,13 @@ export default function VisualCreator() {
               )}
             </div>
           </div>
-        </SectionCard>
+        </div>
 
-        <SectionCard
-          step="03"
-          title="Arka plan"
-          description="Yapay zekâ yalnızca yazısız arka plan üretir; yazı, logo ve renkler şablonla çizilir."
-        >
+        <div className="space-y-4 border-t border-line pt-5">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">Arka plan görseli</h3>
+            <p className="mt-1 text-xs text-muted">İstersen bir fotoğraf yükle veya AI ile yazısız arka plan oluştur.</p>
+          </div>
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-end">
               <div className="space-y-1.5">
@@ -565,7 +618,7 @@ export default function VisualCreator() {
                 </select>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" onClick={generateBackground} disabled={busy}>
+                <Button type="button" onClick={generateBackground} disabled={busy || saving}>
                   {busy ? <IconRefresh className="animate-spin" /> : <IconWand />}
                   {busy ? "Üretiliyor…" : "Yapay zekâyla üret"}
                 </Button>
@@ -576,6 +629,7 @@ export default function VisualCreator() {
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
                     onChange={onUpload}
+                    disabled={busy || saving}
                     className="sr-only"
                   />
                 </label>
@@ -594,17 +648,12 @@ export default function VisualCreator() {
               </div>
             </div>
 
-            {error && <Callout tone="error">{error}</Callout>}
-            {notice && <Callout tone="success">{notice}</Callout>}
-
-            <Callout tone="info">
-              Üretilen görseller, üretici tarafından görünmez bir işaretle (SynthID) etiketlenebilir.
-              Arka plan ve görsel şimdilik kaydedilmez; beğendiğiniz görseli indirin ve takvimdeki
-              paylaşım sırasında elle yükleyin.
-            </Callout>
+            <p className={hintClass}>
+              AI üretimi görseller görünmez SynthID işareti içerebilir. Kütüphaneye kaydedilen PNG özel tutulur ve yalnızca işletme hesabınızdan açılır.
+            </p>
           </div>
-        </SectionCard>
-      </div>
+        </div>
+      </section>
     </div>
   );
 }
