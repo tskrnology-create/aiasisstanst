@@ -22,10 +22,12 @@
 ## UX, erişilebilirlik ve kalite
 
 - [x] Kütüphanede güncel metin taslağı paylaşım kopyasına yansır; içerik düzenleme ve medya işlemleri aktif markayla sınırlıdır.
+- [x] Görsel stüdyosu PNG'si doğrudan tarayıcı Storage yüklemesi yerine Bearer oturumu ve marka sahipliğini doğrulayan `/api/media/library` ile 12 MB sınırında kaydedilir; Storage izin reddi `DEPO_IZIN_400` için uygulanacak migration'ları açıkça gösterir.
+- [x] PNG kaydetme API'si dosya imzasına ek olarak CRC/decode, desteklenen 2.5 MP çözünürlük sınırı ve 12 MB boyut kontrolü uygular; başarısız kayıt sonrası Storage temizliği başarısız olursa dosya yolu bildirilir.
 - [x] Açık/koyu temada `text-faint` tokenı normal metin için ana yüzeylerde WCAG AA kontrastını sağlar; canvas alternatif metni dinamik; dosya seçicide klavye odağı görünür; medya sekmeleri ok/Home/End ile gezilebilir ve seçili paneli ARIA ile ilişkilidir.
 - [x] Node `22.23.4` `.nvmrc` ile sabitlenmiş ve `engines` ile sınırlandırılmıştır; Vitest, `npm test`, `npm run typecheck` komutları eklenmiştir.
 - [x] README ve Pixabay/entegrasyon notları migration sırası, aktif marka, medya sınırları ve manuel yayın davranışıyla güncellenmiştir.
-- [x] Yerel doğrulama: lint, TypeScript, 12 birim testi, üretim build'i ve Git diff kontrolü.
+- [x] Yerel doğrulama: lint, TypeScript, 16 birim testi, üretim build'i ve Git diff kontrolü.
 
 ## Canlı veritabanında bekleyen doğrulama
 

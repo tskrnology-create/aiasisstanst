@@ -116,8 +116,12 @@ export async function POST(request: Request) {
     const uploaded = await uploadVisual(request, path, bytes, mime);
     if (!uploaded.ok) {
       console.error("Pixabay görseli depoya yüklenemedi:", uploaded.status, uploaded.message);
+      const code = storageErrorCode(uploaded);
+      const error = code.startsWith("DEPO_IZIN")
+        ? "Supabase Storage izni reddedildi. SQL Editor'de önce schema_v3_visual_storage.sql, ardından schema_v4_media_library.sql dosyalarını çalıştırın."
+        : "Görsel kaydedilemedi. Lütfen daha sonra tekrar deneyin.";
       return json(
-        { error: "Görsel kaydedilemedi. Lütfen daha sonra tekrar deneyin.", code: storageErrorCode(uploaded) },
+        { error, code },
         500
       );
     }
@@ -146,7 +150,13 @@ export async function POST(request: Request) {
 
     if (insertError || !row) {
       console.error("Pixabay içerik kaydı eklenemedi:", insertError?.message);
-      await removeVisual(request, path);
+      const cleaned = await removeVisual(request, path);
+      if (!cleaned) {
+        return json({
+          error: `Kütüphane kaydı başarısız oldu ve geçici dosya silinemedi. Supabase Storage'da visuals/${path} yolunu elle temizleyin.`,
+          code: "TEMIZLIK_GEREKLI",
+        }, 500);
+      }
       const missingColumn = /visual_type|column|schema cache/i.test(insertError?.message ?? "");
       return json(
         {

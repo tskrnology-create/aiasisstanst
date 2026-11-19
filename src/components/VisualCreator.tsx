@@ -283,45 +283,40 @@ function VisualCreatorWorkspace({
     setSaving(true);
     setError(null);
     setNotice(null);
-    let objectPath = "";
     try {
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((result) => result ? resolve(result) : reject(new Error("PNG hazırlanamadı.")), "image/png");
       });
-      const supabase = getSupabase();
-      objectPath = `${biz.id}/${crypto.randomUUID()}.png`;
-      const { error: uploadError } = await supabase.storage
-        .from("visuals")
-        .upload(objectPath, blob, { contentType: "image/png", upsert: false });
-      if (uploadError) {
-        throw new Error(`Görsel depoya yüklenemedi: ${uploadError.message}. Storage için schema_v3_visual_storage.sql dosyasının uygulanmış olduğunu kontrol edin.`);
-      }
-
       const visualPrompt = selected
         ? `Görsel tasarımı · ${selected.prompt}`
         : `Görsel tasarımı · ${headline.trim() || "Marka içeriği"}`;
-      const { error: insertError } = await supabase.from("contents").insert({
-        business_id: biz.id,
-        parent_id: null,
-        prompt: visualPrompt.slice(0, 500),
-        tone: selected?.tone ?? null,
-        language: biz.content_language,
-        post_text: selected?.post_text || headline.trim() || null,
-        caption: selected?.caption || subline.trim() || null,
-        hashtags: selected?.hashtags ?? [],
-        ad_text: selected?.ad_text ?? null,
-        story_text: selected?.story_text ?? null,
-        visual_url: objectPath,
-        status: "draft",
+      const { data: sessionData, error: sessionError } = await getSupabase().auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (sessionError || !accessToken) throw new Error("Oturum doğrulanamadı. Yeniden giriş yapıp tekrar deneyin.");
+
+      const form = new FormData();
+      form.append("image", blob, "visual.png");
+      form.append("businessId", biz.id);
+      form.append("prompt", visualPrompt.slice(0, 500));
+      form.append("tone", selected?.tone ?? "");
+      form.append("postText", selected?.post_text || headline.trim() || "");
+      form.append("caption", selected?.caption || subline.trim() || "");
+      form.append("hashtags", JSON.stringify(selected?.hashtags ?? []));
+      form.append("adText", selected?.ad_text ?? "");
+      form.append("storyText", selected?.story_text ?? "");
+
+      const response = await fetch("/api/media/library", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: form,
       });
-      if (insertError) {
-        const { error: cleanupError } = await supabase.storage.from("visuals").remove([objectPath]);
-        throw new Error(
-          cleanupError
-            ? `Kütüphane kaydı başarısız oldu (${insertError.message}); geçici görsel de silinemedi (${cleanupError.message}).`
-            : `Kütüphane kaydı başarısız oldu: ${insertError.message}`
-        );
+      const payload = await response.json().catch(() => ({})) as { error?: unknown; content?: ContentRow };
+      if (!response.ok) {
+        throw new Error(typeof payload.error === "string" ? payload.error : "Görsel kütüphaneye kaydedilemedi.");
       }
+      const savedContent = payload.content;
+      if (!savedContent) throw new Error("Görsel kaydedildi ancak kütüphane yanıtı alınamadı.");
+      setContents((current) => [savedContent, ...current.filter((item) => item.id !== savedContent.id)]);
       setNotice("Görsel taslağı kütüphaneye kaydedildi.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Görsel kaydedilemedi.");

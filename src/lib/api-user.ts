@@ -93,11 +93,16 @@ export async function uploadVisual(
   }
 }
 
-export async function removeVisual(request: Request, path: string): Promise<void> {
+export async function removeVisual(request: Request, path: string): Promise<boolean> {
   const url = storageEndpoint(path);
   const headers = storageHeaders(request);
-  if (!url || !headers) return;
-  await fetch(url, { method: "DELETE", headers, signal: AbortSignal.timeout(15_000) }).catch(() => undefined);
+  if (!url || !headers) return false;
+  try {
+    const response = await fetch(url, { method: "DELETE", headers, signal: AbortSignal.timeout(15_000) });
+    return response.ok || response.status === 404;
+  } catch {
+    return false;
+  }
 }
 
 /** Depo hatasını kısa bir tanı koduna çevirir (ayrıntı müşteriye gitmez). */
