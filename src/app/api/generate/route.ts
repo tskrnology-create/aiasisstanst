@@ -1,4 +1,5 @@
 // Metin üretim uç noktası. Oturum/RLS doğrulanır; otomatik sosyal yayınlama yapılmaz.
+import { publicTextError } from "@/lib/public-error";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { authenticateRequest, getBusinessById, isUuid } from "@/lib/api-user";
 import {
@@ -27,7 +28,8 @@ export async function POST(request: Request) {
   const auth = await authenticateRequest(request);
   if (!auth.ok) return auth.response;
   if (!getProvider()) {
-    return json({ error: "Yapay zekâ servisi henüz yapılandırılmadı (GEMINI_API_KEY)." }, 503);
+    console.error("GEMINI_API_KEY tanımlı değil");
+    return json({ error: "Yapay zekâ servisi şu an kullanılamıyor. Lütfen daha sonra tekrar deneyin." }, 503);
   }
 
   let body: { prompt?: unknown; tone?: unknown; parentId?: unknown; businessId?: unknown };
@@ -63,7 +65,7 @@ export async function POST(request: Request) {
   });
   if (reserveError) {
     console.error("Metin üretim rezervasyonu başarısız:", reserveError.code);
-    return json({ error: "Kullanım sınırı denetlenemedi. schema_v5_workspace_and_manual_publishing.sql migration'ının uygulandığını kontrol edin." }, 500);
+    return json({ error: "Kullanım durumu şu an denetlenemedi. Lütfen daha sonra tekrar deneyin." }, 500);
   }
   if (typeof reservationId !== "string") {
     return json({ error: `Saatlik üretim sınırına (${HOURLY_LIMIT}) ulaştınız. Biraz sonra tekrar deneyin.` }, 429);
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
       content_language: business.content_language,
     };
     const result = await generateJson(buildGenerateMessages(profile, { userPrompt: prompt, tone }));
-    if (!result.ok) return json({ error: result.message }, 502);
+    if (!result.ok) return json({ error: publicTextError(result.message) }, 502);
 
     let generated;
     try {

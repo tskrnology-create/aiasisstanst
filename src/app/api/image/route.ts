@@ -1,4 +1,5 @@
 // Yapay zekâ arka plan görseli üretimi; sosyal ağlara otomatik yayın yapılmaz.
+import { publicImageError } from "@/lib/public-error";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { authenticateRequest, getBusinessById, isUuid } from "@/lib/api-user";
 import { FORMATS, type FormatId } from "@/lib/visual-templates";
@@ -28,7 +29,8 @@ export async function POST(request: Request) {
   const auth = await authenticateRequest(request);
   if (!auth.ok) return auth.response;
   if (!imageProviderConfigured()) {
-    return json({ error: "Görsel servisi henüz yapılandırılmadı (GEMINI_API_KEY)." }, 503);
+    console.error("GEMINI_API_KEY tanımlı değil");
+    return json({ error: "Yapay zekâ ile görsel üretimi şu an kullanılamıyor. Stok fotoğraf seçebilir veya kendi görselinizi yükleyebilirsiniz." }, 503);
   }
 
   let body: { topic?: unknown; style?: unknown; format?: unknown; ratio?: unknown; businessId?: unknown };
@@ -60,7 +62,7 @@ export async function POST(request: Request) {
   });
   if (reserveError) {
     console.error("Görsel üretim rezervasyonu başarısız:", reserveError.code);
-    return json({ error: "Kullanım sınırı denetlenemedi. schema_v5_workspace_and_manual_publishing.sql migration'ının uygulandığını kontrol edin." }, 500);
+    return json({ error: "Kullanım durumu şu an denetlenemedi. Lütfen daha sonra tekrar deneyin." }, 500);
   }
   if (typeof reservationId !== "string") {
     return json({ error: `Saatlik görsel üretim sınırına (${HOURLY_LIMIT}) ulaştınız. Biraz sonra tekrar deneyin.` }, 429);
@@ -77,7 +79,7 @@ export async function POST(request: Request) {
       palette,
     });
     const result = await generateImage(prompt, format.aspect);
-    if (!result.ok) return json({ error: result.message }, 502);
+    if (!result.ok) return json({ error: publicImageError(result.message) }, 502);
     saved = true;
     return json({ image: `data:${result.mimeType};base64,${result.data}` });
   } catch (cause) {
