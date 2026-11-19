@@ -51,7 +51,7 @@ Gerekli Supabase veya AI sağlayıcı anahtarları yoksa ilgili özellikler çal
 
 ## Yayın ortamı
 
-Vercel için `.env.example` içindeki değişkenleri proje ayarlarına ekleyin. En azından Supabase URL ve publishable key ile bir metin sağlayıcı anahtarı gerekir. Görsel üretimi için Gemini anahtarı gerekir. `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `GEMINI_IMAGE_MODEL`, `DEEPSEEK_MODEL` ve `OPENAI_MODEL` isteğe bağlı model seçimleridir.
+Vercel için `.env.example` içindeki değişkenleri proje ayarlarına ekleyin. En azından Supabase URL ve publishable key ile bir metin sağlayıcı anahtarı gerekir. Görsel üretimi için Gemini anahtarı (ücretli plan gerekebilir) veya ücretsiz stok fotoğraf için `PEXELS_API_KEY` (pexels.com/api, yalnızca sunucuda) gerekir. Pexels şartı: fotoğraf gösterilen yerde Pexels bağlantısı ve fotoğrafçı atfı (arayüzde var); sınır saatte 200 istek. `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `GEMINI_IMAGE_MODEL`, `DEEPSEEK_MODEL` ve `OPENAI_MODEL` isteğe bağlı model seçimleridir.
 
 Supabase başlangıç SQL'leri:
 

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { businessStore, type StoredBusiness } from "@/lib/business-store";
 import { STATUS_LABEL, type ContentRow } from "@/lib/library-utils";
+import type { StockPhoto } from "@/lib/stock";
 import {
   FORMATS,
   TEMPLATES,
@@ -94,6 +95,13 @@ export default function VisualCreator() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Stok fotoğraf (Pexels)
+  const [stockQuery, setStockQuery] = useState("");
+  const [stockResults, setStockResults] = useState<StockPhoto[]>([]);
+  const [stockBusy, setStockBusy] = useState(false);
+  const [stockError, setStockError] = useState<string | null>(null);
+  const [credit, setCredit] = useState<StockPhoto | null>(null);
 
   // Profil ve içerikler
   useEffect(() => {
@@ -187,11 +195,86 @@ export default function VisualCreator() {
       const img = await loadImage(body.image as string);
       setBackground(img);
       setTemplate("fotograf");
+      setCredit(null);
       setNotice("Arka plan hazır. Yazıyı ve şablonu değiştirebilirsiniz.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bilinmeyen hata.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function callStock(payload: Record<string, unknown>) {
+    const { data } = await getSupabase().auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error("Oturum bulunamadı, tekrar giriş yapın.");
+    const res = await fetch("/api/stock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error ?? "İşlem başarısız.");
+    return body;
+  }
+
+  async function searchStock(e?: React.FormEvent) {
+    e?.preventDefault();
+    const query = stockQuery.trim();
+    if (query.length < 2) {
+      setStockError("Aranacak bir kelime yazın.");
+      return;
+    }
+    setStockBusy(true);
+    setStockError(null);
+    try {
+      const body = await callStock({
+        action: "search",
+        query,
+        orientation: format === "post" ? "square" : "portrait",
+      });
+      const photos = (body.photos ?? []) as StockPhoto[];
+      setStockResults(photos);
+      if (photos.length === 0) setStockError("Sonuç bulunamadı. Daha genel bir kelime deneyin.");
+    } catch (err) {
+      setStockError(err instanceof Error ? err.message : "Bilinmeyen hata.");
+    } finally {
+      setStockBusy(false);
+    }
+  }
+
+  async function suggestKeywords() {
+    const topic = (selected?.prompt || headline).trim();
+    if (topic.length < 3) {
+      setStockError("Önce bir içerik seçin veya görseldeki yazıyı girin.");
+      return;
+    }
+    setStockBusy(true);
+    setStockError(null);
+    try {
+      const body = await callStock({ action: "suggest", topic: topic.slice(0, 300) });
+      setStockQuery(body.query as string);
+    } catch (err) {
+      setStockError(err instanceof Error ? err.message : "Bilinmeyen hata.");
+    } finally {
+      setStockBusy(false);
+    }
+  }
+
+  async function pickStock(photo: StockPhoto) {
+    setStockBusy(true);
+    setStockError(null);
+    try {
+      const body = await callStock({ action: "image", url: photo.full });
+      const img = await loadImage(body.image as string);
+      setBackground(img);
+      setTemplate("fotograf");
+      setCredit(photo);
+      setNotice("Fotoğraf eklendi. Yazıyı ve şablonu değiştirebilirsiniz.");
+    } catch (err) {
+      setStockError(err instanceof Error ? err.message : "Bilinmeyen hata.");
+    } finally {
+      setStockBusy(false);
     }
   }
 
@@ -215,6 +298,7 @@ export default function VisualCreator() {
         .then((img) => {
           setBackground(img);
           setTemplate("fotograf");
+          setCredit(null);
         })
         .catch(() => setError("Fotoğraf okunamadı."));
     };
@@ -358,6 +442,18 @@ export default function VisualCreator() {
           </div>
           {error && <Callout tone="error" className="mt-3">{error}</Callout>}
           {notice && <Callout tone="success" className="mt-3">{notice}</Callout>}
+          {credit && (
+            <p className="mt-3 text-xs text-muted">
+              Fotoğraf:{" "}
+              <a href={credit.photographerUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                {credit.photographer}
+              </a>{" "}
+              ·{" "}
+              <a href={credit.pageUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                Pexels
+              </a>
+            </p>
+          )}
           <div className="mt-3 space-y-2">
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2 text-xs text-muted">
@@ -596,7 +692,7 @@ export default function VisualCreator() {
         <div className="space-y-4 border-t border-line pt-5">
           <div>
             <h3 className="text-sm font-semibold text-ink">Arka plan görseli</h3>
-            <p className="mt-1 text-xs text-muted">İstersen bir fotoğraf yükle veya AI ile yazısız arka plan oluştur.</p>
+            <p className="mt-1 text-xs text-muted">İstersen ücretsiz stok fotoğraf seç, kendi fotoğrafını yükle veya AI ile yazısız arka plan oluştur.</p>
           </div>
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-end">
@@ -639,6 +735,7 @@ export default function VisualCreator() {
                     variant="ghost"
                     onClick={() => {
                       setBackground(null);
+                      setCredit(null);
                       setNotice(null);
                     }}
                   >
@@ -646,6 +743,56 @@ export default function VisualCreator() {
                   </Button>
                 )}
               </div>
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-line p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-ink">Ücretsiz stok fotoğraf</h4>
+                <a
+                  href="https://www.pexels.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted underline underline-offset-4"
+                >
+                  Fotoğraflar Pexels&apos;ten
+                </a>
+              </div>
+              <form onSubmit={searchStock} className="flex flex-wrap gap-2">
+                <input
+                  className={selectClass + " min-w-0 flex-1"}
+                  value={stockQuery}
+                  onChange={(e) => setStockQuery(e.target.value)}
+                  maxLength={100}
+                  placeholder="Örn. autumn sale (İngilizce daha iyi sonuç verir)"
+                  aria-label="Fotoğraf ara"
+                />
+                <Button type="submit" variant="secondary" disabled={stockBusy || saving}>
+                  Ara
+                </Button>
+                <Button type="button" variant="secondary" disabled={stockBusy || saving} onClick={suggestKeywords}>
+                  İçeriğe göre öner
+                </Button>
+              </form>
+              {stockBusy && <p className={hintClass}>Bekleyin…</p>}
+              {stockError && <Callout tone="error">{stockError}</Callout>}
+              {stockResults.length > 0 && (
+                <div className="grid grid-cols-3 gap-2" role="list" aria-label="Fotoğraf sonuçları">
+                  {stockResults.map((ph) => (
+                    <button
+                      key={ph.id}
+                      type="button"
+                      role="listitem"
+                      disabled={stockBusy || saving}
+                      onClick={() => pickStock(ph)}
+                      className="overflow-hidden rounded-lg border border-line hover:border-line-strong disabled:opacity-60"
+                      title={`${ph.photographer} / Pexels`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={ph.thumb} alt={ph.alt || "Stok fotoğraf"} className="aspect-square w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <p className={hintClass}>
