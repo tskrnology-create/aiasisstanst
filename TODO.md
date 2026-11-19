@@ -17,6 +17,7 @@
 - [x] Sosyal hesap eşitlemesi `sync_social_accounts` RPC'sinde atomiktir; doğrulama hatası eski hesapları silmez ve mevcut hesap kimliklerini/plan bağlantılarını korur.
 - [x] Metin ve görsel üretim kotası DB advisory lock ile marka başına atomik rezerve edilir; başarısız istek rezervasyonu bırakır.
 - [x] İçerik ve alt kayıtları DB'de birlikte silinir; özel Storage dosyası silinemiyorsa tekrar denenebilir kuyrukta kalır.
+- [x] `visuals` Storage okuma/yükleme/silme politikaları `SECURITY DEFINER` sahiplik doğrulayıcısıyla kullanıcıya ait `business_id` klasörünü denetler; güncel v3 betiği bucket ve üç policy'yi idempotent biçimde kurar.
 - [x] `schema_v2_image_usage.sql` policy'si ve yeni v5 migration tekrar çalıştırılabilir biçimdedir.
 
 ## UX, erişilebilirlik ve kalite
@@ -31,4 +32,4 @@
 
 ## Canlı veritabanında bekleyen doğrulama
 
-- [ ] Kullanıcının Supabase staging ortamında v2–v5 migration sırasını uygulayıp tekrar çalıştırma güvenliğini, iki kullanıcıyla RLS izolasyonunu, eşzamanlı kota yarışını ve Storage hata telafisini doğrulayın. Bu depo oturumunda canlı/staging veritabanına yazma yapılmadı.
+- [ ] Kullanıcının Supabase staging ortamında v2, güncel v3, v4 ve v5 migration sırasını uygulayıp tekrar çalıştırma güvenliğini, iki kullanıcıyla RLS izolasyonunu, eşzamanlı kota yarışını ve Storage hata telafisini doğrulayın. Bu depo oturumunda canlı/staging veritabanına yazma yapılmadı.

@@ -59,7 +59,7 @@ Supabase başlangıç SQL'leri:
 
 1. `schema.sql`
 2. `schema_v2_image_usage.sql` (eski görsel üretim kullanım kaydı; politika tekrar çalıştırılabilir)
-3. `schema_v3_visual_storage.sql` (özel görsel deposu ve işletme sahibine göre Storage politikaları)
+3. `schema_v3_visual_storage.sql` (özel görsel deposu ve `businesses` RLS görünürlüğünü aşmadan sahiplik denetleyen Storage politikaları)
 4. `schema_v4_media_library.sql` (medya türü alanı, genişletilmiş MIME/50 MB limitli özel bucket)
 5. `schema_v5_workspace_and_manual_publishing.sql` (manuel yayın günlüğü/hedef hesap, atomik sosyal hesap eşitleme ve üretim kotası, telafi edilebilir Storage temizliği)
 
@@ -72,7 +72,7 @@ Supabase başlangıç SQL'leri:
 - Metin ve görsel üretim uçları oturum belirtecini ve seçilen markanın sahipliğini doğrular; `schema_v5_workspace_and_manual_publishing.sql` kotayı DB kilidiyle atomik olarak ayırır (marka başına saatte metin 30, görsel 10). Başarısız üretim rezervasyonu bırakır.
 - Canlıya çıkmadan önce staging veritabanında iki kullanıcıyla RLS izolasyonunu, eşzamanlı kota çağrılarını, sağlayıcı limitlerini ve maliyet alarmlarını ayrıca doğrulayın.
 - Pixabay aramasında API anahtarı yalnızca sunucu tarafındaki `PIXABAY_API_KEY` olarak saklanır. Arama sonuçları 24 saat cache edilir; Pixabay fotoğraf URL'leri kalıcı hotlink edilmez, seçilen dosya sunucuda 12 MB akış sınırıyla özel depoya indirilir. 3D modeller için resmi Pixabay API endpoint'i olmadığı için uygulama Pixabay 3D kataloğuna yönlendirir; yüklenen `.glb` dosyası sunucuda doğrulanır (50 MB sınırı, GLB v2 yapısı, harici doku/URL reddi). Uygulama kaynak bilgilerini kayda ekler; üçüncü taraf marka/kişilik/telif haklarını ayrıca kontrol edin. Detaylar [`docs/pixabay-integration-notes.md`](docs/pixabay-integration-notes.md) dosyasındadır.
-- Kütüphaneye görsel/GLB kaydetmek için `schema_v3_visual_storage.sql` ve ardından `schema_v4_media_library.sql` uygulanmalıdır. Bucket özeldir; yalnızca medya yolundaki işletmenin sahibi dosyayı okuyabilir, yükleyebilir ve silebilir. Görsel stüdyosu PNG'si `/api/media/library` üzerinden Bearer oturumu ve marka sahipliği doğrulanarak, 12 MB sınırıyla kaydedilir; `DEPO_IZIN_400` görülürse bu iki migration'ı belirtilen sırayla Supabase SQL Editor'de tekrar çalıştırın. v5 içeriği ve alt kayıtlarını DB'den temizler, Storage hatasını yeniden denenebilir kuyruğa alır.
+- Kütüphaneye görsel/GLB kaydetmek için `schema_v3_visual_storage.sql` ve ardından `schema_v4_media_library.sql` uygulanmalıdır. Bucket özeldir; yalnızca medya yolundaki işletmenin sahibi dosyayı okuyabilir, yükleyebilir ve silebilir. Görsel stüdyosu PNG'si `/api/media/library` üzerinden Bearer oturumu ve marka sahipliği doğrulanarak, 12 MB sınırıyla kaydedilir. `DEPO_IZIN_400` görülürse depoda bu güncel `schema_v3_visual_storage.sql` sürümünü (SECURITY DEFINER sahiplik kontrolünü içerir) ve ardından `schema_v4_media_library.sql` dosyasını Supabase SQL Editor'de tekrar çalıştırın. v5 içeriği ve alt kayıtlarını DB'den temizler, Storage hatasını yeniden denenebilir kuyruğa alır.
 - Şifre sıfırlama, e-posta daveti, ekip/rol yönetimi, denetim kaydı ve hesap silme akışları bu MVP'de tamamlanmış ürün özellikleri olarak sunulmaz.
 
 ## Marka paleti kuralı
