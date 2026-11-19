@@ -4,7 +4,7 @@
 //  - image  : seçilen fotoğrafı sunucudan alıp data URL olarak döndür
 // Anahtar yalnızca sunucuda (PEXELS_API_KEY).
 
-import { authenticate } from "@/lib/api-auth";
+import { authenticate, rateLimited } from "@/lib/api-auth";
 import { generateJson } from "@/lib/llm";
 import {
   ORIENTATIONS,
@@ -20,6 +20,8 @@ export const maxDuration = 60;
 
 const MAX_QUERY_LEN = 100;
 const MAX_TOPIC_LEN = 300;
+const SEARCH_LIMIT_PER_HOUR = 60;
+const SUGGEST_LIMIT_PER_HOUR = 20;
 
 const json = (body: Record<string, unknown>, status = 200) => Response.json(body, { status });
 
@@ -45,6 +47,9 @@ export async function POST(request: Request) {
     const orientation = ORIENTATIONS.includes(body.orientation as Orientation)
       ? (body.orientation as Orientation)
       : "square";
+    if (rateLimited(`stock-search:${auth.userId}`, SEARCH_LIMIT_PER_HOUR)) {
+      return json({ error: "Saatlik fotoğraf arama sınırına ulaştınız. Biraz sonra tekrar deneyin." }, 429);
+    }
     const result = await searchPexels(pexelsKey, query, orientation);
     if (!result.ok) return json({ error: result.message }, 502);
     return json({ photos: result.photos });
@@ -54,6 +59,9 @@ export async function POST(request: Request) {
     const topic = typeof body.topic === "string" ? body.topic.trim() : "";
     if (topic.length < 3) return json({ error: "Önce bir içerik seçin veya yazıyı girin." }, 400);
     if (topic.length > MAX_TOPIC_LEN) return json({ error: `Konu en fazla ${MAX_TOPIC_LEN} karakter olabilir.` }, 400);
+    if (rateLimited(`stock-suggest:${auth.userId}`, SUGGEST_LIMIT_PER_HOUR)) {
+      return json({ error: "Saatlik öneri sınırına ulaştınız. Aramayı kendiniz yazabilirsiniz." }, 429);
+    }
     const { data: biz } = await auth.supabase
       .from("businesses")
       .select("industry")

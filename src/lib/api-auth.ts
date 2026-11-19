@@ -4,7 +4,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export type AuthResult =
-  | { ok: true; supabase: SupabaseClient }
+  | { ok: true; supabase: SupabaseClient; userId: string }
   | { ok: false; response: Response };
 
 export async function authenticate(request: Request): Promise<AuthResult> {
@@ -26,5 +26,24 @@ export async function authenticate(request: Request): Promise<AuthResult> {
   if (error || !data.user) {
     return { ok: false, response: Response.json({ error: "Oturum geçersiz, tekrar giriş yapın." }, { status: 401 }) };
   }
-  return { ok: true, supabase };
+  return { ok: true, supabase, userId: data.user.id };
+}
+
+// Basit kullanıcı başına saatlik sınır (sunucu örneği belleğinde). Sunucusuz ortamda
+// örnekler arasında paylaşılmaz; bu yüzden kesin değil, kötüye kullanıma karşı ilk frendir.
+const hits = new Map<string, number[]>();
+
+export function rateLimited(key: string, limit: number, windowMs = 60 * 60 * 1000): boolean {
+  const now = Date.now();
+  const recent = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
+  if (recent.length >= limit) {
+    hits.set(key, recent);
+    return true;
+  }
+  recent.push(now);
+  hits.set(key, recent);
+  if (hits.size > 5000) {
+    for (const [k, v] of hits) if (v.every((t) => now - t >= windowMs)) hits.delete(k);
+  }
+  return false;
 }
