@@ -6,7 +6,6 @@ import { getSupabase } from "@/lib/supabase";
 import { loadImage, postApi } from "@/lib/api-client";
 import { businessStore, type StoredBusiness } from "@/lib/business-store";
 import { STATUS_LABEL, type ContentRow } from "@/lib/library-utils";
-import type { StockPhoto } from "@/lib/stock";
 import {
   FORMATS,
   TEMPLATE_USAGE,
@@ -24,12 +23,13 @@ import {
 import { Button, Callout, Chip, LinkButton, Segmented, StatusPill, Tag, cx, hintClass, inputClass, selectClass } from "./Ui";
 import { IconDownload, IconImage, IconLibrary, IconRefresh, IconSparkles, IconWand } from "./Icons";
 import TemplateGallery from "./visual/TemplateGallery";
-import StockPanel from "./visual/StockPanel";
+import MediaPicker from "./MediaPicker";
+import { useBusinessContext } from "./BusinessContext";
 
 type TextSource = "post_text" | "ad_text" | "story_text" | "caption";
 type Style = "photo" | "illustration" | "abstract";
 type Tab = "content" | "design" | "background";
-type BgMode = "stock" | "upload" | "ai";
+type BgMode = "media" | "upload" | "ai";
 
 const SOURCE_LABEL: Record<TextSource, string> = {
   post_text: "Gönderi metni",
@@ -48,7 +48,7 @@ const TABS: ReadonlyArray<{ value: Tab; label: string }> = [
   { value: "background", label: "3 · Arka plan" },
 ];
 const BG_MODES: ReadonlyArray<{ value: BgMode; label: string }> = [
-  { value: "stock", label: "Stok fotoğraf" },
+  { value: "media", label: "Pixabay medya" },
   { value: "upload", label: "Yükle" },
   { value: "ai", label: "Yapay zekâ" },
 ];
@@ -63,11 +63,29 @@ function toHeadline(text: string | null): string {
 }
 
 export default function VisualCreator() {
+  const { activeBusinessId, isBusinessLoading } = useBusinessContext();
+  return (
+    <VisualCreatorWorkspace
+      key={activeBusinessId ?? "no-brand"}
+      activeBusinessId={activeBusinessId}
+      isBusinessLoading={isBusinessLoading}
+    />
+  );
+}
+
+function VisualCreatorWorkspace({
+  activeBusinessId,
+  isBusinessLoading,
+}: {
+  activeBusinessId: string | null;
+  isBusinessLoading: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [biz, setBiz] = useState<StoredBusiness | null>(null);
   const [contents, setContents] = useState<ContentRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const loading = isBusinessLoading || (Boolean(activeBusinessId) && !profileLoaded);
 
   const [contentId, setContentId] = useState("");
   const [source, setSource] = useState<TextSource>("post_text");
@@ -80,7 +98,7 @@ export default function VisualCreator() {
   const [showStorySafeArea, setShowStorySafeArea] = useState(true);
   const [style, setStyle] = useState<Style>("photo");
   const [tab, setTab] = useState<Tab>("content");
-  const [bgMode, setBgMode] = useState<BgMode>("stock");
+  const [bgMode, setBgMode] = useState<BgMode>("media");
 
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
   const [background, setBackground] = useState<HTMLImageElement | null>(null);
@@ -89,27 +107,29 @@ export default function VisualCreator() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Stok fotoğraf atfı (Pexels)
-  const [credit, setCredit] = useState<StockPhoto | null>(null);
-
-  // Profil ve içerikler
+  // Profil ve içerikler yalnızca seçili markadan yüklenir.
   useEffect(() => {
+    if (isBusinessLoading || !activeBusinessId) return;
+    let active = true;
     Promise.all([
-      businessStore.get(),
+      businessStore.get(activeBusinessId),
       getSupabase()
         .from("contents")
         .select("*")
+        .eq("business_id", activeBusinessId)
         .order("created_at", { ascending: false })
         .limit(100),
     ])
       .then(([b, c]) => {
+        if (!active) return;
         setBiz(b);
         if (c.error) setLoadError("İçerikler yüklenemedi: " + c.error.message);
         else setContents((c.data ?? []) as ContentRow[]);
       })
-      .catch((err: Error) => setLoadError("Yüklenemedi: " + err.message))
-      .finally(() => setLoading(false));
-  }, []);
+      .catch((err: Error) => { if (active) setLoadError("Yüklenemedi: " + err.message); })
+      .finally(() => { if (active) setProfileLoaded(true); });
+    return () => { active = false; };
+  }, [activeBusinessId, isBusinessLoading]);
 
   // Logo
   useEffect(() => {
@@ -180,6 +200,10 @@ export default function VisualCreator() {
   async function generateBackground() {
     setError(null);
     setNotice(null);
+    if (!biz?.id) {
+      setError("Görsel üretmek için önce aktif bir marka seçin.");
+      return;
+    }
     const topic = (selected?.prompt || headline).trim();
     if (topic.length < 3) {
       setError("Önce bir içerik seçin veya görseldeki yazıyı girin.");
@@ -192,11 +216,11 @@ export default function VisualCreator() {
         style,
         format,
         ratio: ratioId,
+        businessId: biz.id,
       });
       const img = await loadImage(body.image);
       setBackground(img);
       setTemplate("fotograf");
-      setCredit(null);
       setNotice("Arka plan hazır. Yazıyı ve şablonu değiştirebilirsiniz.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bilinmeyen hata.");
@@ -225,7 +249,6 @@ export default function VisualCreator() {
         .then((img) => {
           setBackground(img);
           setTemplate("fotograf");
-          setCredit(null);
         })
         .catch(() => setError("Fotoğraf okunamadı."));
     };
@@ -329,7 +352,6 @@ export default function VisualCreator() {
 
   const palette = readPalette(biz.brand_colors, ratioId);
   const working = busy || saving;
-  const topic = (selected?.prompt || headline).trim();
 
   return (
     <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,23rem)_minmax(0,1fr)]">
@@ -343,7 +365,7 @@ export default function VisualCreator() {
           <div className="relative mx-auto w-full max-w-[17rem] sm:max-w-[19rem]">
             <canvas
               ref={canvasRef}
-              aria-label="Görsel önizleme"
+              aria-label={`Görsel önizlemesi: ${headline.trim() || selected?.prompt || "boş taslak"}; ${FORMATS[format].label}; ${biz.name}.`}
               className="block h-auto w-full rounded-xl border border-line shadow-soft"
             />
             {format === "story" && showStorySafeArea && (
@@ -380,18 +402,6 @@ export default function VisualCreator() {
           </div>
           {error && <Callout tone="error" className="mt-3">{error}</Callout>}
           {notice && <Callout tone="success" className="mt-3">{notice}</Callout>}
-          {credit && (
-            <p className="mt-3 text-xs text-muted">
-              Fotoğraf:{" "}
-              <a href={credit.photographerUrl} target="_blank" rel="noopener noreferrer" className="underline">
-                {credit.photographer}
-              </a>{" "}
-              ·{" "}
-              <a href={credit.pageUrl} target="_blank" rel="noopener noreferrer" className="underline">
-                Pexels
-              </a>
-            </p>
-          )}
         </div>
         {loadError && <Callout tone="error">{loadError}</Callout>}
       </div>
@@ -562,7 +572,6 @@ export default function VisualCreator() {
                   size="sm"
                   onClick={() => {
                     setBackground(null);
-                    setCredit(null);
                     setNotice(null);
                   }}
                 >
@@ -571,18 +580,17 @@ export default function VisualCreator() {
               )}
             </div>
 
-            {bgMode === "stock" && (
-              <StockPanel
-                format={format}
-                topic={topic}
+            {bgMode === "media" && (
+              <MediaPicker
+                business={biz}
                 disabled={working}
-                onPick={(img, photo) => {
+                onImageSelected={(img) => {
                   setBackground(img);
                   setTemplate("fotograf");
-                  setCredit(photo);
                   setError(null);
-                  setNotice("Fotoğraf eklendi. Şablonu Tasarım sekmesinden değiştirebilirsiniz.");
+                  setNotice("Pixabay fotoğrafı eklendi. Şablonu Tasarım sekmesinden değiştirebilirsiniz.");
                 }}
+                onContentSaved={(row) => setContents((current) => [row, ...current.filter((item) => item.id !== row.id)])}
               />
             )}
 

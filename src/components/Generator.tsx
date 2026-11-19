@@ -17,6 +17,7 @@ import {
 } from "./Ui";
 import { CopyButton } from "./ShareControls";
 import { IconCalendar, IconImage, IconLayers, IconSparkles, IconWand } from "./Icons";
+import { useBusinessContext } from "./BusinessContext";
 
 interface GeneratedRow {
   id: string;
@@ -129,6 +130,11 @@ function ResultCard({ row, headline }: { row: GeneratedRow; headline?: string })
 }
 
 export default function Generator() {
+  const { activeBusinessId } = useBusinessContext();
+  return <GeneratorWorkspace key={activeBusinessId ?? "no-brand"} businessId={activeBusinessId} />;
+}
+
+function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
   // "Yeniden kullan" bağlantısı ?prompt=... ile gelir. Bu bileşen yalnızca
   // oturum açıldıktan sonra (istemcide) çizildiği için window güvenle okunur.
   const [prompt, setPrompt] = useState(() => {
@@ -144,6 +150,10 @@ export default function Generator() {
   const [alternatives, setAlternatives] = useState<GeneratedRow[]>([]);
 
   async function generate(opts: { prompt: string; tone: Tone | ""; parentId?: string }) {
+    if (!businessId) {
+      setError("İçerik üretmek için önce aktif bir marka seçin.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -158,6 +168,7 @@ export default function Generator() {
         },
         body: JSON.stringify({
           prompt: opts.prompt,
+          businessId,
           tone: opts.tone || undefined,
           parentId: opts.parentId,
         }),
@@ -182,6 +193,10 @@ export default function Generator() {
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
+    if (!businessId) {
+      setError("İçerik üretmek için önce aktif bir marka seçin.");
+      return;
+    }
     const trimmed = prompt.trim();
     if (trimmed.length < 3) {
       setError("Lütfen ne üretmek istediğinizi yazın.");
@@ -232,11 +247,12 @@ export default function Generator() {
           </div>
 
           {error && <Callout tone="error">{error}</Callout>}
+          {!businessId && <Callout tone="warning">İçerik üretmeden önce bir marka oluşturup seçin.</Callout>}
 
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || !businessId}
               className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand px-5 text-sm font-semibold text-brand-ink shadow-[0_10px_30px_-12px_var(--brand)] transition hover:bg-brand-strong active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
             >
               <IconWand className="h-4 w-4" />

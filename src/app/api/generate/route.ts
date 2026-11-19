@@ -1,12 +1,6 @@
-// İçerik üretim uç noktası.
-// Güvenlik ilkeleri:
-//  - Yapay zekâ anahtarı (GEMINI_API_KEY veya OPENAI_API_KEY) yalnızca sunucuda durur.
-//  - Kullanıcının oturum belirteci ile Supabase'e bağlanılır; böylece RLS geçerli
-//    kalır ve kullanıcı yalnızca kendi işletmesinin profilini okuyabilir.
-//  - Saatlik üretim limiti vardır (maliyet kontrolü).
-//  - Kullanıcı girdisi uzunluk ve ton listesiyle sınırlandırılır.
-
-import { createClient } from "@supabase/supabase-js";
+// Metin üretim uç noktası. Oturum/RLS doğrulanır; otomatik sosyal yayınlama yapılmaz.
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { authenticateRequest, getBusinessById, isUuid } from "@/lib/api-user";
 import {
   buildGenerateMessages,
   parseGeneratedContent,
@@ -15,43 +9,28 @@ import {
 import { isTone } from "@/lib/tones";
 import { generateJson, getProvider } from "@/lib/llm";
 
-// Yeniden denemeler dahil üretim 60 sn'ye kadar sürebilir.
 export const maxDuration = 60;
 
 const MAX_PROMPT_LEN = 500;
 const HOURLY_LIMIT = 30;
 
 function json(body: Record<string, unknown>, status = 200) {
-  return Response.json(body, { status });
+  return Response.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
+}
+
+async function releaseReservation(supabase: SupabaseClient, reservationId: string) {
+  const { error } = await supabase.rpc("release_generation", { p_reservation_id: reservationId });
+  if (error) console.error("Üretim rezervasyonu bırakılamadı:", error.code);
 }
 
 export async function POST(request: Request) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !anonKey) return json({ error: "Sunucu ayarları eksik." }, 500);
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
   if (!getProvider()) {
-    return json(
-      { error: "Yapay zekâ servisi henüz yapılandırılmadı (GEMINI_API_KEY)." },
-      503
-    );
+    return json({ error: "Yapay zekâ servisi henüz yapılandırılmadı (GEMINI_API_KEY)." }, 503);
   }
 
-  // 1) Oturum
-  const auth = request.headers.get("authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (!token) return json({ error: "Giriş yapmanız gerekiyor." }, 401);
-
-  const supabase = createClient(url, anonKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: userData, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !userData.user) {
-    return json({ error: "Oturum geçersiz, tekrar giriş yapın." }, 401);
-  }
-
-  // 2) Girdi doğrulama
-  let body: { prompt?: unknown; tone?: unknown; parentId?: unknown };
+  let body: { prompt?: unknown; tone?: unknown; parentId?: unknown; businessId?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -67,83 +46,82 @@ export async function POST(request: Request) {
     if (!isTone(body.tone)) return json({ error: "Geçersiz ton." }, 400);
     tone = body.tone;
   }
-  const parentId = typeof body.parentId === "string" ? body.parentId : null;
+  const parentId = body.parentId === undefined || body.parentId === null || body.parentId === ""
+    ? null
+    : isUuid(body.parentId) ? body.parentId : null;
+  if (body.parentId && !parentId) return json({ error: "Üst içerik kimliği geçersiz." }, 400);
 
-  // 3) İşletme profili (RLS: yalnızca kendi kaydı döner)
-  const { data: row, error: bizError } = await supabase
-    .from("businesses")
-    .select("*")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (bizError) return json({ error: "Profil okunamadı." }, 500);
-  if (!row) return json({ error: "Önce işletme profilinizi kaydedin." }, 400);
+  const { supabase } = auth;
+  if (!isUuid(body.businessId)) return json({ error: "Geçerli bir marka seçimi gerekli." }, 400);
+  const { business, error: businessError } = await getBusinessById(supabase, body.businessId);
+  if (businessError) return json({ error: "Seçili marka profili okunamadı." }, 500);
+  if (!business) return json({ error: "Seçili marka bulunamadı veya bu hesaba ait değil." }, 404);
 
-  const profile: BusinessProfile = {
-    name: row.name,
-    industry: row.industry,
-    products: row.products,
-    target_audience: row.target_audience,
-    brand_voice: row.brand_voice,
-    brand_colors: row.brand_colors ?? [],
-    content_language: row.content_language,
-  };
-
-  // 4) Saatlik limit
-  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count, error: countError } = await supabase
-    .from("contents")
-    .select("id", { count: "exact", head: true })
-    .eq("business_id", row.id)
-    .gte("created_at", since);
-  if (countError) return json({ error: "Limit kontrol edilemedi." }, 500);
-  if ((count ?? 0) >= HOURLY_LIMIT) {
-    return json(
-      { error: `Saatlik üretim sınırına (${HOURLY_LIMIT}) ulaştınız. Biraz sonra tekrar deneyin.` },
-      429
-    );
+  const { data: reservationId, error: reserveError } = await supabase.rpc("reserve_generation", {
+    p_business_id: business.id,
+    p_kind: "text",
+  });
+  if (reserveError) {
+    console.error("Metin üretim rezervasyonu başarısız:", reserveError.code);
+    return json({ error: "Kullanım sınırı denetlenemedi. schema_v5_workspace_and_manual_publishing.sql migration'ının uygulandığını kontrol edin." }, 500);
+  }
+  if (typeof reservationId !== "string") {
+    return json({ error: `Saatlik üretim sınırına (${HOURLY_LIMIT}) ulaştınız. Biraz sonra tekrar deneyin.` }, 429);
   }
 
-  // 5) Yapay zekâ çağrısı
-  const messages = buildGenerateMessages(profile, { userPrompt: prompt, tone });
-  const result = await generateJson(messages);
-  if (!result.ok) return json({ error: result.message }, 502);
-  const raw = result.text;
-
-  let generated;
+  let saved = false;
   try {
-    generated = parseGeneratedContent(raw);
-  } catch {
-    return json({ error: "Üretilen içerik okunamadı, tekrar deneyin." }, 502);
-  }
-  generated.hashtags = generated.hashtags
-    .map((t) => t.trim())
-    .filter(Boolean)
-    .map((t) => (t.startsWith("#") ? t : `#${t.replace(/\s+/g, "")}`))
-    .slice(0, 20);
+    const profile: BusinessProfile = {
+      name: business.name,
+      industry: business.industry,
+      products: business.products,
+      target_audience: business.target_audience,
+      brand_voice: business.brand_voice,
+      brand_colors: business.brand_colors ?? [],
+      content_language: business.content_language,
+    };
+    const result = await generateJson(buildGenerateMessages(profile, { userPrompt: prompt, tone }));
+    if (!result.ok) return json({ error: result.message }, 502);
 
-  // 6) Kayıt (RLS + check_same_business tetikleyicisi geçerli)
-  const { data: saved, error: saveError } = await supabase
-    .from("contents")
-    .insert({
-      business_id: row.id,
-      parent_id: parentId,
-      prompt,
-      tone: tone ?? null,
-      language: row.content_language,
-      post_text: generated.post_text,
-      caption: generated.caption,
-      hashtags: generated.hashtags,
-      ad_text: generated.ad_text,
-      story_text: generated.story_text,
-      status: "draft",
-    })
-    .select("*")
-    .single();
-  if (saveError) {
-    console.error("İçerik kaydedilemedi:", saveError.code);
-    return json({ error: "İçerik kaydedilemedi." }, 500);
-  }
+    let generated;
+    try {
+      generated = parseGeneratedContent(result.text);
+    } catch {
+      return json({ error: "Üretilen içerik okunamadı, tekrar deneyin." }, 502);
+    }
+    generated.hashtags = generated.hashtags
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .map((tag) => (tag.startsWith("#") ? tag : `#${tag.replace(/\s+/g, "")}`))
+      .slice(0, 20);
 
-  return json({ content: saved });
+    const { data: content, error: saveError } = await supabase
+      .from("contents")
+      .insert({
+        business_id: business.id,
+        parent_id: parentId,
+        prompt,
+        tone: tone ?? null,
+        language: business.content_language,
+        post_text: generated.post_text,
+        caption: generated.caption,
+        hashtags: generated.hashtags,
+        ad_text: generated.ad_text,
+        story_text: generated.story_text,
+        status: "draft",
+      })
+      .select("*")
+      .single();
+    if (saveError || !content) {
+      console.error("İçerik kaydedilemedi:", saveError?.code);
+      return json({ error: "İçerik kaydedilemedi." }, 500);
+    }
+    saved = true;
+    return json({ content });
+  } catch (cause) {
+    console.error("İçerik üretimi başarısız:", cause instanceof Error ? cause.message : "unknown");
+    return json({ error: "İçerik üretimi şu anda tamamlanamadı. Daha sonra tekrar deneyin." }, 502);
+  } finally {
+    if (!saved) await releaseReservation(supabase, reservationId);
+  }
 }

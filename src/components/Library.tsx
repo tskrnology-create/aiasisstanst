@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
+import { useBusinessContext } from "./BusinessContext";
 import type { SocialPlatform } from "@/lib/business-store";
 import { shareText } from "@/lib/calendar-utils";
 import {
@@ -26,6 +27,7 @@ import {
   inputClass,
 } from "./Ui";
 import { CopyButton, OpenPlatformButton, PlatformPicker } from "./ShareControls";
+import ModelViewer from "./ModelViewer";
 import {
   IconArrowRight,
   IconDownload,
@@ -37,6 +39,30 @@ import {
 } from "./Icons";
 
 const PAGE_LIMIT = 200;
+
+async function processMediaCleanupQueue(businessId: string): Promise<string | null> {
+  const supabase = getSupabase();
+  const { data: queued, error: queueError } = await supabase
+    .from("media_cleanup_queue")
+    .select("id, object_path")
+    .eq("business_id", businessId)
+    .order("created_at", { ascending: true })
+    .limit(100);
+  if (queueError) return `Medya temizleme kuyruğu okunamadı: ${queueError.message}`;
+  if (!queued?.length) return null;
+
+  const { error: storageError } = await supabase.storage
+    .from("visuals")
+    .remove(queued.map((item) => item.object_path));
+  if (storageError) return `İçerik silindi; ${queued.length} medya dosyasının temizliği yeniden denenecek.`;
+
+  const { error: clearError } = await supabase
+    .from("media_cleanup_queue")
+    .delete()
+    .in("id", queued.map((item) => item.id));
+  if (clearError) return "Medya dosyaları silindi; temizlik kuyruğu sonraki açılışta tekrar işlenecek.";
+  return null;
+}
 
 const FILTERS: Array<{ value: "all" | ContentStatus; label: string }> = [
   { value: "all", label: "Tümü" },
@@ -88,7 +114,7 @@ function ItemCard({
 }: {
   row: ContentRow;
   onUpdated: (row: ContentRow) => void;
-  onDeleted: (id: string, warning?: string) => void;
+  onDeleted: (warning?: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -102,8 +128,17 @@ function ItemCard({
   const [storyText, setStoryText] = useState(row.story_text ?? "");
   const [visualResult, setVisualResult] = useState<{ key: string; src?: string; error?: string } | null>(null);
   const visualSrc = visualResult?.key === row.visual_url ? visualResult.src ?? null : null;
+  const visualType = row.visual_type ?? "image";
   const visualError = visualResult?.key === row.visual_url ? visualResult.error ?? null : null;
   const visualLoading = Boolean(open && row.visual_url && visualResult?.key !== row.visual_url);
+  const currentRow: ContentRow = {
+    ...row,
+    post_text: postText,
+    caption,
+    hashtags: parseHashtags(hashtags),
+    ad_text: adText,
+    story_text: storyText,
+  };
 
   useEffect(() => {
     let active = true;
@@ -147,6 +182,7 @@ function ItemCard({
         status,
       })
       .eq("id", row.id)
+      .eq("business_id", row.business_id)
       .select("*")
       .single();
     setBusy(false);
@@ -161,23 +197,19 @@ function ItemCard({
   }
 
   async function remove() {
-    if (!window.confirm("Bu içerik kalıcı olarak silinsin mi?")) return;
+    if (!window.confirm("Bu içerik ve varsa alternatifleri kalıcı olarak silinsin mi? Bağlı takvim planları da kaldırılır.")) return;
     setBusy(true);
     setError(null);
     const supabase = getSupabase();
-    const { error: err } = await supabase.from("contents").delete().eq("id", row.id);
-    if (err) {
+    const { error: deleteError } = await supabase.rpc("delete_content_tree", { p_content_id: row.id });
+    if (deleteError) {
       setBusy(false);
-      setError("Silinemedi: " + err.message);
+      setError(`İçerik silinemedi: ${deleteError.message}. schema_v5_workspace_and_manual_publishing.sql migration'ını kontrol edin.`);
       return;
     }
-    let warning: string | undefined;
-    if (row.visual_url && !/^(https?:|data:|blob:)/i.test(row.visual_url)) {
-      const { error: storageError } = await supabase.storage.from("visuals").remove([row.visual_url]);
-      if (storageError) warning = "İçerik silindi ancak görsel dosyası depodan silinemedi; erişim politikasını kontrol edin.";
-    }
+    const cleanupWarning = await processMediaCleanupQueue(row.business_id);
     setBusy(false);
-    onDeleted(row.id, warning);
+    onDeleted(cleanupWarning ?? undefined);
   }
 
   const date = new Date(row.created_at).toLocaleDateString("tr-TR", {
@@ -205,7 +237,12 @@ function ItemCard({
           <span aria-hidden="true">·</span>
           <span>{row.tone ? `Ton: ${row.tone}` : "Marka diline göre"}</span>
           {row.parent_id && <Tag>Alternatif</Tag>}
-          {row.visual_url && <Tag tone="brand"><IconImage className="h-3 w-3" />Görsel</Tag>}
+          {row.visual_url && (
+            <Tag tone="brand">
+              <IconImage className="h-3 w-3" />
+              {visualType === "video" ? "Video" : visualType === "model" ? "3D model" : "Görsel"}
+            </Tag>
+          )}
           <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-faint">
             {open ? "Daralt" : "Düzenle ve paylaş"}
             <IconArrowRight className={cx("h-3.5 w-3.5 transition", open && "rotate-90")} />
@@ -222,16 +259,24 @@ function ItemCard({
           {row.visual_url && (
             <div className="rounded-xl border border-line bg-surface-2/50 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-faint">Kaydedilmiş görsel</p>
-                {visualSrc && <a href={visualSrc} target="_blank" rel="noreferrer" className="text-xs font-medium text-brand hover:underline">Tam boy aç</a>}
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-faint">
+                  {visualType === "video" ? "Kaydedilmiş video" : visualType === "model" ? "Kaydedilmiş 3D model" : "Kaydedilmiş görsel"}
+                </p>
+                {visualSrc && <a href={visualSrc} target="_blank" rel="noreferrer" className="text-xs font-medium text-brand hover:underline">Dosyayı aç</a>}
               </div>
               {visualLoading ? (
-                <p className="text-xs text-muted">Görsel yükleniyor…</p>
+                <p className="text-xs text-muted">Medya yükleniyor…</p>
               ) : visualError ? (
                 <p className="text-xs text-danger">{visualError}</p>
               ) : visualSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={visualSrc} alt={`${row.prompt} görsel tasarımı`} className="max-h-[32rem] w-full rounded-lg object-contain" />
+                visualType === "video" ? (
+                  <video src={visualSrc} controls preload="metadata" className="max-h-[32rem] w-full rounded-lg bg-black object-contain" />
+                ) : visualType === "model" ? (
+                  <ModelViewer src={visualSrc} alt={`${row.prompt} 3D modeli`} />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={visualSrc} alt={`${row.prompt} görsel tasarımı`} className="max-h-[32rem] w-full rounded-lg object-contain" />
+                )
               ) : null}
             </div>
           )}
@@ -263,7 +308,7 @@ function ItemCard({
                 Arşivle
               </Button>
             )}
-            <Button type="button" size="sm" variant="ghost" onClick={() => downloadText(row)}>
+            <Button type="button" size="sm" variant="ghost" onClick={() => downloadText(currentRow)}>
               <IconDownload />İndir (.txt)
             </Button>
             <LinkButton href={`/uret?prompt=${encodeURIComponent(row.prompt)}`} size="sm" variant="ghost">
@@ -289,9 +334,9 @@ function ItemCard({
             </div>
             <PlatformPicker value={platform} onChange={setPlatform} />
             <div className="flex flex-wrap items-center gap-2">
-              <CopyButton text={shareText(row)} label="Paylaşım metnini kopyala" />
+              <CopyButton text={shareText(currentRow)} label="Paylaşım metnini kopyala" />
               <OpenPlatformButton platform={platform} />
-              <CopyButton text={contentToText(row)} label="Tüm alanları kopyala" variant="ghost" />
+              <CopyButton text={contentToText(currentRow)} label="Tüm alanları kopyala" variant="ghost" />
             </div>
             {platform && (
               <p className={hintClass}>
@@ -310,25 +355,56 @@ function ItemCard({
 }
 
 export default function Library() {
+  const { activeBusinessId, isBusinessLoading } = useBusinessContext();
+  return (
+    <LibraryWorkspace
+      key={activeBusinessId ?? "no-brand"}
+      businessId={activeBusinessId}
+      isBusinessLoading={isBusinessLoading}
+    />
+  );
+}
+
+function LibraryWorkspace({
+  businessId,
+  isBusinessLoading,
+}: {
+  businessId: string | null;
+  isBusinessLoading: boolean;
+}) {
   const [rows, setRows] = useState<ContentRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ message: string; tone: "success" | "warning" } | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ContentStatus>("all");
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const loading = isBusinessLoading || (Boolean(businessId) && !loaded);
 
   useEffect(() => {
-    getSupabase()
-      .from("contents")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(PAGE_LIMIT)
-      .then(({ data, error: err }) => {
-        if (err) setError("İçerikler yüklenemedi: " + err.message);
-        else setRows((data ?? []) as ContentRow[]);
-        setLoading(false);
-      });
-  }, []);
+    if (isBusinessLoading || !businessId) return;
+    let cancelled = false;
+    void (async () => {
+      const cleanupWarning = await processMediaCleanupQueue(businessId);
+      const { data, error: err } = await getSupabase()
+        .from("contents")
+        .select("*")
+        .eq("business_id", businessId)
+        .order("created_at", { ascending: false })
+        .limit(PAGE_LIMIT);
+      if (cancelled) return;
+      if (err) setError("İçerikler yüklenemedi: " + err.message);
+      else setRows((data ?? []) as ContentRow[]);
+      if (cleanupWarning) setNotice({ message: cleanupWarning, tone: "warning" });
+      setLoaded(true);
+    })().catch((cause) => {
+      if (!cancelled) {
+        setError(cause instanceof Error ? cause.message : "Kütüphane yüklenemedi.");
+        setLoaded(true);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [businessId, isBusinessLoading, refreshVersion]);
 
   const visible = useMemo(
     () =>
@@ -337,6 +413,10 @@ export default function Library() {
       ),
     [rows, query, statusFilter]
   );
+
+  if (!businessId && !isBusinessLoading) {
+    return <Callout tone="warning">Kütüphaneyi kullanmak için önce bir marka oluşturup seçin.</Callout>;
+  }
 
   if (loading) {
     return (
@@ -416,8 +496,8 @@ export default function Library() {
             key={row.id}
             row={row}
             onUpdated={(u) => setRows((all) => all.map((r) => (r.id === u.id ? u : r)))}
-            onDeleted={(id, warning) => {
-              setRows((all) => all.filter((r) => r.id !== id));
+            onDeleted={(warning) => {
+              setRefreshVersion((version) => version + 1);
               setNotice(warning
                 ? { message: warning, tone: "warning" }
                 : { message: "İçerik kütüphaneden silindi.", tone: "success" });

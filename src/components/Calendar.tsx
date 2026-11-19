@@ -8,6 +8,7 @@ import { STATUS_LABEL, type ContentStatus } from "@/lib/library-utils";
 import { MANUAL_SHARE_NOTE, shareTarget } from "@/lib/share-links";
 import {
   REMINDER_LABEL,
+  normalizePostUrl,
   addDays,
   computeRemindAt,
   dayKey,
@@ -41,6 +42,7 @@ import {
   selectClass,
 } from "./Ui";
 import { CopyButton, OpenPlatformButton } from "./ShareControls";
+import { useBusinessContext } from "./BusinessContext";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -62,27 +64,39 @@ interface PickerContent {
   status: ContentStatus;
 }
 
+interface CalendarSocialAccount {
+  id: string;
+  platform: SocialPlatform;
+  handle: string;
+}
+
 // PostgREST filtresinde milisaniyesiz ISO kullanılır.
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
 
 function ItemRow({
   item,
   showDate,
+  accounts,
   onChanged,
 }: {
   item: CalendarItem;
   showDate?: boolean;
+  accounts: CalendarSocialAccount[];
   onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [markingPosted, setMarkingPosted] = useState(false);
+  const [postUrl, setPostUrl] = useState(item.post_url ?? "");
   const [when, setWhen] = useState(toLocalInput(new Date(item.scheduled_at)));
 
   const scheduled = new Date(item.scheduled_at);
   const overdue = isOverdue(item, new Date());
   const c = item.contents;
+  const account = accounts.find((entry) => entry.id === item.social_account_id);
   const target = shareTarget(item.platform);
+  const postedUrl = item.post_url ? normalizePostUrl(item.post_url) : null;
   const text = shareText(c);
 
   async function run(action: () => PromiseLike<{ error: { message: string } | null }>) {
@@ -115,8 +129,26 @@ function ItemRow({
         .from("calendar_items")
         .update({ scheduled_at: next.toISOString(), remind_at: remind })
         .eq("id", item.id)
+        .eq("business_id", item.business_id)
     );
     if (ok) setEditing(false);
+  }
+
+  async function markPosted(event: React.FormEvent) {
+    event.preventDefault();
+    const normalizedUrl = normalizePostUrl(postUrl);
+    if (normalizedUrl === undefined) {
+      setError("Gönderi bağlantısı http:// veya https:// ile başlamalıdır.");
+      return;
+    }
+    const ok = await run(() =>
+      getSupabase()
+        .from("calendar_items")
+        .update({ done: true, posted_at: new Date().toISOString(), post_url: normalizedUrl })
+        .eq("id", item.id)
+        .eq("business_id", item.business_id)
+    );
+    if (ok) setMarkingPosted(false);
   }
 
   return (
@@ -146,6 +178,7 @@ function ItemRow({
         ) : (
           <span className="font-medium text-faint">Platform seçilmedi</span>
         )}
+        {account && <span className="rounded-lg bg-surface-2 px-2 py-1 text-[11px] font-medium text-ink-soft">{account.handle}</span>}
         {c && <StatusPill status={c.status} />}
         {item.done && (
           <Tag tone="ok">
@@ -154,6 +187,9 @@ function ItemRow({
           </Tag>
         )}
         {overdue && <Tag tone="danger">Gecikmiş</Tag>}
+        {item.done && item.posted_at && (
+          <span className="text-[11px] text-muted">Gerçekleşti: {new Date(item.posted_at).toLocaleString("tr-TR")}</span>
+        )}
       </div>
 
       <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-ink">
@@ -173,11 +209,18 @@ function ItemRow({
           variant={item.done ? "ghost" : "soft"}
           size="sm"
           disabled={busy}
-          onClick={() =>
-            run(() =>
-              getSupabase().from("calendar_items").update({ done: !item.done }).eq("id", item.id)
-            )
-          }
+          onClick={() => {
+            if (!item.done) {
+              setPostUrl(item.post_url ?? "");
+              setMarkingPosted((open) => !open);
+              return;
+            }
+            run(() => getSupabase()
+              .from("calendar_items")
+              .update({ done: false, posted_at: null, post_url: null })
+              .eq("id", item.id)
+              .eq("business_id", item.business_id));
+          }}
         >
           {item.done ? <IconRefresh /> : <IconCheck />}
           {item.done ? "Geri al" : "Paylaşıldı"}
@@ -202,7 +245,7 @@ function ItemRow({
           title="Plandan kaldır"
           onClick={() => {
             if (!window.confirm("Bu plan takvimden kaldırılsın mı? (İçerik kütüphanede kalır.)")) return;
-            run(() => getSupabase().from("calendar_items").delete().eq("id", item.id));
+            run(() => getSupabase().from("calendar_items").delete().eq("id", item.id).eq("business_id", item.business_id));
           }}
           className="ml-auto grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:bg-danger-soft hover:text-danger disabled:opacity-50"
         >
@@ -212,6 +255,28 @@ function ItemRow({
 
       {editing && (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface-2/70 p-2.5">
+          <select
+            aria-label="Hedef sosyal hesap"
+            className={cx(selectClass, "w-auto min-w-[13rem] flex-1 py-2")}
+            value={item.social_account_id ?? ""}
+            disabled={busy}
+            onChange={(event) => {
+              const nextAccount = accounts.find((entry) => entry.id === event.target.value);
+              run(() => getSupabase()
+                .from("calendar_items")
+                .update({
+                  social_account_id: nextAccount?.id ?? null,
+                  platform: nextAccount?.platform ?? item.platform,
+                })
+                .eq("id", item.id)
+                .eq("business_id", item.business_id));
+            }}
+          >
+            <option value="">Platform geneli / hesap yok</option>
+            {accounts.map((entry) => (
+              <option key={entry.id} value={entry.id}>{PLATFORM_LABELS[entry.platform]} · {entry.handle}</option>
+            ))}
+          </select>
           <input
             type="datetime-local"
             className={cx(inputClass, "w-auto min-w-[14rem] flex-1 py-2")}
@@ -227,6 +292,31 @@ function ItemRow({
           </Button>
         </div>
       )}
+      {markingPosted && (
+        <form onSubmit={markPosted} className="mt-3 space-y-2 rounded-xl border border-ok/25 bg-ok-soft/30 p-3">
+          <p className="text-xs font-semibold text-ink">Manuel paylaşımı kaydet</p>
+          <label className="block space-y-1">
+            <span className="text-xs text-muted">Yayınlanan gönderinin bağlantısı (isteğe bağlı)</span>
+            <input
+              type="url"
+              className={inputClass}
+              value={postUrl}
+              onChange={(event) => setPostUrl(event.target.value)}
+              placeholder="https://…"
+              aria-label="Yayınlanan gönderinin bağlantısı"
+            />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" size="sm" disabled={busy}><IconCheck />Paylaşımı kaydet</Button>
+            <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setMarkingPosted(false)}>Vazgeç</Button>
+          </div>
+        </form>
+      )}
+      {item.done && postedUrl && (
+        <a href={postedUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex text-xs font-medium text-brand hover:underline">
+          Yayınlanan gönderiyi aç ↗
+        </a>
+      )}
       {error && <p className="mt-2 text-xs font-medium text-danger">{error}</p>}
       {target?.hint && (
         <p className={cx(hintClass, "mt-2")}>{target.hint}</p>
@@ -239,15 +329,18 @@ function AddForm({
   day,
   businessId,
   contents,
+  accounts,
   onAdded,
 }: {
   day: Date;
   businessId: string;
   contents: PickerContent[];
+  accounts: CalendarSocialAccount[];
   onAdded: () => void;
 }) {
   const [contentId, setContentId] = useState("");
   const [platform, setPlatform] = useState<SocialPlatform>("instagram");
+  const [socialAccountId, setSocialAccountId] = useState("");
   const [time, setTime] = useState("10:00");
   const [reminder, setReminder] = useState<ReminderOption>("1h");
   const [busy, setBusy] = useState(false);
@@ -269,7 +362,8 @@ function AddForm({
     const { error: err } = await getSupabase().from("calendar_items").insert({
       business_id: businessId,
       content_id: contentId,
-      platform,
+      social_account_id: socialAccountId || null,
+      platform: accounts.find((account) => account.id === socialAccountId)?.platform ?? platform,
       scheduled_at: scheduled.toISOString(),
       remind_at: computeRemindAt(scheduled, reminder),
     });
@@ -315,7 +409,7 @@ function AddForm({
         </select>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label htmlFor="cal-platform" className="text-sm font-medium text-ink">
             Platform
@@ -324,12 +418,36 @@ function AddForm({
             id="cal-platform"
             className={selectClass}
             value={platform}
-            onChange={(e) => setPlatform(e.target.value as SocialPlatform)}
+            onChange={(e) => {
+              const nextPlatform = e.target.value as SocialPlatform;
+              setPlatform(nextPlatform);
+              if (accounts.find((account) => account.id === socialAccountId)?.platform !== nextPlatform) {
+                setSocialAccountId("");
+              }
+            }}
           >
             {Object.entries(PLATFORM_LABELS).map(([v, l]) => (
               <option key={v} value={v}>
                 {l}
               </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="cal-account" className="text-sm font-medium text-ink">Hedef hesap (isteğe bağlı)</label>
+          <select
+            id="cal-account"
+            className={selectClass}
+            value={socialAccountId}
+            onChange={(event) => {
+              const nextAccount = accounts.find((account) => account.id === event.target.value);
+              setSocialAccountId(nextAccount?.id ?? "");
+              if (nextAccount) setPlatform(nextAccount.platform);
+            }}
+          >
+            <option value="">Hesap seçin…</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>{PLATFORM_LABELS[account.platform]} · {account.handle}</option>
             ))}
           </select>
         </div>
@@ -364,6 +482,10 @@ function AddForm({
         </div>
       </div>
 
+      {accounts.length === 0 && (
+        <p className={hintClass}>Bu markaya bağlı sosyal hesap yok. İsterseniz platform seçimini kullanabilir veya marka profilinden hesap ekleyebilirsiniz.</p>
+      )}
+
       {error && <Callout tone="error">{error}</Callout>}
 
       <Button type="submit" disabled={busy} className="w-full">
@@ -375,15 +497,16 @@ function AddForm({
 }
 
 export default function Calendar() {
+  const { activeBusinessId, isBusinessLoading } = useBusinessContext();
   const today = useMemo(() => startOfDay(new Date()), []);
   const [view, setView] = useState<"month" | "week">("month");
   const [cursor, setCursor] = useState<Date>(today);
   const [selected, setSelected] = useState<Date>(today);
-  const [businessId, setBusinessId] = useState<string | null>(null);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadedBusinessId, setLoadedBusinessId] = useState<string | null>(null);
   const [items, setItems] = useState<CalendarItem[]>([]);
   const [attention, setAttention] = useState<CalendarItem[]>([]);
   const [contents, setContents] = useState<PickerContent[]>([]);
+  const [accounts, setAccounts] = useState<CalendarSocialAccount[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
 
@@ -392,66 +515,62 @@ export default function Calendar() {
   const rangeTo = addDays(grid[41], 1);
   const rangeKey = dayKey(rangeFrom);
 
-  // İşletme ve içerik listesi (bir kez)
+  // Bütün takvim verileri aynı business_id ile yüklenir ve marka değişiminde iptal edilir.
   useEffect(() => {
-    const supabase = getSupabase();
-    Promise.all([
-      supabase
-        .from("businesses")
-        .select("id")
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("contents")
-        .select("id, prompt, tone, status")
-        .order("created_at", { ascending: false })
-        .limit(100),
-    ]).then(([biz, cont]) => {
-      if (biz.error) setError("Profil okunamadı: " + biz.error.message);
-      else setBusinessId(biz.data?.id ?? null);
-      if (cont.error) setError("İçerikler okunamadı: " + cont.error.message);
-      else setContents((cont.data ?? []) as PickerContent[]);
-      setInitialLoading(false);
-    });
-  }, []);
-
-  // Görünen aralıktaki planlar + "bugün ve gecikmiş" listesi
-  useEffect(() => {
+    if (isBusinessLoading || !activeBusinessId) return;
     let cancelled = false;
     const supabase = getSupabase();
     const now = new Date();
     Promise.all([
       supabase
+        .from("social_accounts")
+        .select("id, platform, handle")
+        .eq("business_id", activeBusinessId)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("contents")
+        .select("id, prompt, tone, status")
+        .eq("business_id", activeBusinessId)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      supabase
         .from("calendar_items")
         .select(SELECT_ITEM)
+        .eq("business_id", activeBusinessId)
         .gte("scheduled_at", iso(rangeFrom))
         .lt("scheduled_at", iso(rangeTo))
         .order("scheduled_at", { ascending: true }),
       supabase
         .from("calendar_items")
         .select(SELECT_ITEM)
+        .eq("business_id", activeBusinessId)
         .eq("done", false)
         .or(`scheduled_at.lt.${iso(endOfDay(now))},remind_at.lte.${iso(now)}`)
         .order("scheduled_at", { ascending: true })
         .limit(50),
-    ]).then(([range, att]) => {
+    ]).then(([social, cont, range, att]) => {
       if (cancelled) return;
-      if (range.error) setError("Takvim yüklenemedi: " + range.error.message);
-      else {
-        setError(null);
-        setItems((range.data ?? []) as unknown as CalendarItem[]);
+      const loadError = social.error ?? cont.error ?? range.error ?? att.error;
+      setError(loadError ? `Takvim verileri yüklenemedi: ${loadError.message}` : null);
+      setAccounts((social.data ?? []) as CalendarSocialAccount[]);
+      setContents((cont.data ?? []) as PickerContent[]);
+      setItems((range.data ?? []) as unknown as CalendarItem[]);
+      setAttention((att.data ?? []) as unknown as CalendarItem[]);
+      setLoadedBusinessId(activeBusinessId);
+    }).catch((cause) => {
+      if (!cancelled) {
+        setError(cause instanceof Error ? cause.message : "Takvim verileri yüklenemedi.");
+        setLoadedBusinessId(activeBusinessId);
       }
-      if (!att.error) setAttention((att.data ?? []) as unknown as CalendarItem[]);
     });
-    return () => {
-      cancelled = true;
-    };
-    // rangeFrom/rangeTo rangeKey'den türetilir
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeKey, version]);
+    return () => { cancelled = true; };
+  }, [activeBusinessId, isBusinessLoading, rangeKey, rangeFrom, rangeTo, version]);
 
-  const byDay = useMemo(() => groupByDay(items), [items]);
+  const dataReady = !isBusinessLoading && loadedBusinessId === activeBusinessId;
+  const visibleAttention = dataReady ? attention : [];
+  const visibleContents = dataReady ? contents : [];
+  const visibleAccounts = dataReady ? accounts : [];
+  const byDay = useMemo(() => groupByDay(dataReady ? items : []), [dataReady, items]);
   const reload = () => setVersion((v) => v + 1);
 
   function move(delta: number) {
@@ -467,7 +586,7 @@ export default function Calendar() {
     if (view === "month" && d.getMonth() !== cursor.getMonth()) setCursor(d);
   }
 
-  if (initialLoading) {
+  if (isBusinessLoading || (activeBusinessId && !dataReady)) {
     return (
       <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-5 text-sm text-muted shadow-soft">
         <span className="h-4 w-4 animate-spin rounded-full border-2 border-line-strong border-t-brand" />
@@ -476,7 +595,7 @@ export default function Calendar() {
     );
   }
 
-  if (!businessId) {
+  if (!activeBusinessId) {
     return (
       <Callout tone="warning">
         Takvimi kullanmak için önce{" "}
@@ -498,16 +617,16 @@ export default function Calendar() {
     <div className="space-y-5">
       {error && <Callout tone="error">{error}</Callout>}
 
-      {attention.length > 0 && (
+      {visibleAttention.length > 0 && (
         <SectionCard
           step="Öncelik"
           title="Paylaşım bekleyenler"
           description="Bugün paylaşılacaklar, gecikenler ve hatırlatma zamanı gelenler."
-          aside={<Tag tone="danger">{attention.length} iş</Tag>}
+          aside={<Tag tone="danger">{visibleAttention.length} iş</Tag>}
         >
           <ul className="space-y-3">
-            {attention.map((item) => (
-              <ItemRow key={item.id} item={item} showDate onChanged={reload} />
+            {visibleAttention.map((item) => (
+              <ItemRow key={item.id} item={item} accounts={visibleAccounts} showDate onChanged={reload} />
             ))}
           </ul>
         </SectionCard>
@@ -645,7 +764,7 @@ export default function Calendar() {
                   ) : (
                     <ul className="space-y-2">
                       {list.map((item) => (
-                        <ItemRow key={item.id} item={item} onChanged={reload} />
+                        <ItemRow key={item.id} item={item} accounts={visibleAccounts} onChanged={reload} />
                       ))}
                     </ul>
                   )}
@@ -671,14 +790,14 @@ export default function Calendar() {
             ) : (
               <ul className="space-y-3">
                 {selectedItems.map((item) => (
-                  <ItemRow key={item.id} item={item} onChanged={reload} />
+                  <ItemRow key={item.id} item={item} accounts={visibleAccounts} onChanged={reload} />
                 ))}
               </ul>
             ))}
         </SectionCard>
 
         <SectionCard step="Planla" title="Bu güne içerik ekle">
-          <AddForm key={dayKey(selected)} day={selected} businessId={businessId} contents={contents} onAdded={reload} />
+          <AddForm key={`${activeBusinessId}:${dayKey(selected)}`} day={selected} businessId={activeBusinessId} contents={visibleContents} accounts={visibleAccounts} onAdded={reload} />
         </SectionCard>
       </div>
 

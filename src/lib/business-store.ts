@@ -1,6 +1,5 @@
-// Depolama katmanı: işletme profili Supabase'de (businesses + social_accounts).
-// Erişim güvenliğini schema.sql içindeki RLS politikaları sağlar; her
-// kullanıcı yalnızca kendi işletmesini okuyup yazabilir.
+// İşletme profili Supabase'de (businesses + social_accounts) tutulur.
+// RLS kullanıcı sahipliğini sağlar; çağıran ekran aktif business_id'yi açıkça verir.
 
 import type { BusinessProfile } from "./brand-prompt";
 import { getSupabase } from "./supabase";
@@ -16,6 +15,7 @@ export type SocialPlatform =
   | "other";
 
 export interface SocialAccount {
+  id?: string;
   platform: SocialPlatform;
   handle: string;
 }
@@ -23,31 +23,30 @@ export interface SocialAccount {
 export interface StoredBusiness extends BusinessProfile {
   id?: string;
   // v1'de logo küçük bir data URL olarak businesses.logo_url sütununda tutulur.
-  // Storage bucket'ına geçiş sonraki aşamada.
   logo_data_url: string | null;
   social_accounts: SocialAccount[];
 }
 
 export interface BusinessStore {
-  get(): Promise<StoredBusiness | null>;
+  get(businessId?: string | null): Promise<StoredBusiness | null>;
   save(business: StoredBusiness): Promise<{ id: string }>;
 }
 
 export const businessStore: BusinessStore = {
-  async get() {
+  async get(businessId) {
+    if (!businessId) return null;
     const supabase = getSupabase();
     const { data: row, error } = await supabase
       .from("businesses")
       .select("*")
-      .order("created_at", { ascending: true })
-      .limit(1)
+      .eq("id", businessId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) return null;
 
     const { data: accounts, error: accError } = await supabase
       .from("social_accounts")
-      .select("platform, handle")
+      .select("id, platform, handle")
       .eq("business_id", row.id)
       .order("created_at", { ascending: true });
     if (accError) throw new Error(accError.message);
@@ -59,8 +58,7 @@ export const businessStore: BusinessStore = {
       products: row.products ?? "",
       target_audience: row.target_audience ?? "",
       brand_voice: row.brand_voice ?? "",
-      // [0] = ana renk, [1] = yardımcı renk. Eski kayıtlardaki 0, 1 veya 3+ renk
-      // readPalette içinde güvenle karşılanır; burada yalnızca ilk ikisi tutulur.
+      // [0] = ana renk, [1] = yardımcı renk. Eski kayıtlar readPalette içinde karşılanır.
       brand_colors: (row.brand_colors ?? []).slice(0, 2),
       content_language: row.content_language,
       logo_data_url: row.logo_url ?? null,
@@ -73,12 +71,10 @@ export const businessStore: BusinessStore = {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) throw new Error("Oturum bulunamadı, tekrar giriş yapın.");
 
-    // Kayıt her zaman tam iki renk içerir.
     const storedColors = toStoredColors(
       business.brand_colors?.[0] ?? "",
       business.brand_colors?.[1] ?? ""
     );
-
     const fields = {
       name: business.name,
       industry: business.industry,
@@ -92,41 +88,41 @@ export const businessStore: BusinessStore = {
 
     let businessId = business.id;
     if (businessId) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("businesses")
         .update(fields)
-        .eq("id", businessId);
-      if (error) throw new Error(error.message);
+        .eq("id", businessId)
+        .select("id")
+        .single();
+      if (error || !data) throw new Error(error?.message ?? "İşletme güncellenemedi.");
     } else {
       const { data, error } = await supabase
         .from("businesses")
         .insert({ ...fields, owner_id: userData.user.id })
         .select("id")
         .single();
-      if (error) throw new Error(error.message);
+      if (error || !data) throw new Error(error?.message ?? "İşletme oluşturulamadı.");
       businessId = data.id as string;
     }
 
-    // Sosyal hesaplar: önce sil, sonra güncel listeyi yaz.
-    const { error: delError } = await supabase
-      .from("social_accounts")
-      .delete()
-      .eq("business_id", businessId);
-    if (delError) throw new Error(delError.message);
-
     const unique = new Map<string, SocialAccount>();
-    for (const a of business.social_accounts) {
-      unique.set(`${a.platform}:${a.handle}`, a);
+    for (const account of business.social_accounts) {
+      const handle = account.handle.trim();
+      if (!handle) continue;
+      unique.set(`${account.platform}:${handle.toLocaleLowerCase()}`, { ...account, handle });
     }
-    if (unique.size > 0) {
-      const { error: insError } = await supabase.from("social_accounts").insert(
-        [...unique.values()].map((a) => ({
-          business_id: businessId,
-          platform: a.platform,
-          handle: a.handle,
-        }))
+    const { error: accountsError } = await supabase.rpc("sync_social_accounts", {
+      p_business_id: businessId,
+      p_accounts: [...unique.values()].map(({ id, platform, handle }) => ({
+        id: id ?? null,
+        platform,
+        handle,
+      })),
+    });
+    if (accountsError) {
+      throw new Error(
+        `Marka kaydedildi ancak sosyal hesaplar eşitlenemedi: ${accountsError.message}. schema_v5_workspace_and_manual_publishing.sql migration'ını kontrol edin.`
       );
-      if (insError) throw new Error(insError.message);
     }
 
     return { id: businessId };
@@ -139,7 +135,6 @@ export const EMPTY_BUSINESS: StoredBusiness = {
   products: "",
   target_audience: "",
   brand_voice: "",
-  // Boş başlangıç: kullanıcı ana + yardımcı renk seçmek zorundadır.
   brand_colors: [],
   content_language: "tr",
   logo_data_url: null,
@@ -168,7 +163,6 @@ export function validateBusiness(b: StoredBusiness): ValidationErrors {
   if (!b.name.trim()) errors.name = "İşletme adı gerekli.";
   if (!b.industry.trim()) errors.industry = "Sektör gerekli.";
 
-  // Markada tam olarak iki renk olur: ana (baskın) ve yardımcı (vurgu).
   const colors = b.brand_colors ?? [];
   const rawPrimary = colors[0] ?? "";
   const rawSecondary = colors[1] ?? "";
@@ -183,7 +177,7 @@ export function validateBusiness(b: StoredBusiness): ValidationErrors {
     errors.brand_colors = "Ana ve yardımcı renk aynı olamaz; vurgu görünmez hâle gelir.";
   }
 
-  if (b.social_accounts.some((a) => !a.handle.trim())) {
+  if (b.social_accounts.some((account) => !account.handle.trim())) {
     errors.social_accounts = "Boş hesap satırlarını doldurun veya silin.";
   }
   return errors;

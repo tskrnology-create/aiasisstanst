@@ -17,10 +17,13 @@ export interface CalendarItem {
   id: string;
   business_id: string;
   content_id: string;
+  social_account_id: string | null;
   platform: SocialPlatform | null;
   scheduled_at: string; // ISO
   remind_at: string | null; // ISO
   done: boolean;
+  posted_at: string | null;
+  post_url: string | null;
   contents: CalendarContent | null;
 }
 
@@ -95,6 +98,19 @@ export function computeRemindAt(scheduled: Date, option: ReminderOption): string
   if (option === "none") return null;
   const ms = option === "1h" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
   return new Date(scheduled.getTime() - ms).toISOString();
+}
+
+/** Boş değer isteğe bağlıdır; dolu değer yalnızca HTTP(S) paylaşım bağlantısı olabilir. */
+export function normalizePostUrl(value: string): string | null | undefined {
+  const input = value.trim();
+  if (!input) return null;
+  try {
+    const url = new URL(input);
+    if ((url.protocol !== "https:" && url.protocol !== "http:") || !url.hostname) return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
 }
 
 export function groupByDay(items: CalendarItem[]): Map<string, CalendarItem[]> {

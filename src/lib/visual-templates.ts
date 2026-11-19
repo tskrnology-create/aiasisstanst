@@ -182,6 +182,12 @@ export interface VisualSpec {
   logoSize?: { w: number; h: number };
   background: CanvasImageSource | null;
   backgroundSize?: { w: number; h: number };
+  /** Metin stüdyosundaki canlı düzenleme tercihleri. */
+  textScale?: number;
+  textColor?: string;
+  textAlign?: "left" | "center" | "right";
+  textOffsetX?: number;
+  textOffsetY?: number;
 }
 
 interface Box {
@@ -239,36 +245,45 @@ function drawTextBlock(
   const head = spec.headline.trim();
   const sub = spec.subline.trim();
   if (!head && !sub) return null;
-  const gap = sub && head ? Math.round(spec.width * 0.03) : 0;
+  const scale = Math.min(1.5, Math.max(0.7, spec.textScale ?? 1));
+  const layout: Box = {
+    x: Math.max(0, Math.min(spec.width - box.w, box.x + (spec.textOffsetX ?? 0) * spec.width)),
+    y: Math.max(0, Math.min(spec.height - box.h, box.y + (spec.textOffsetY ?? 0) * spec.height)),
+    w: box.w,
+    h: box.h,
+  };
+  const gap = sub && head ? Math.round(spec.width * 0.03 * scale) : 0;
 
   const headFit = head
-    ? fitText(ctx, head, box.w, sub ? box.h * 0.72 : box.h, spec.width * 0.115, 40, 800)
+    ? fitText(ctx, head, layout.w, sub ? layout.h * 0.72 : layout.h, spec.width * 0.115 * scale, Math.max(28, 40 * scale), 800)
     : null;
-  const remaining = box.h - (headFit ? headFit.height : 0) - gap;
+  const remaining = layout.h - (headFit ? headFit.height : 0) - gap;
   const subFit = sub && remaining > 40
-    ? fitText(ctx, sub, box.w, remaining, spec.width * 0.05, 26, 500)
+    ? fitText(ctx, sub, layout.w, remaining, spec.width * 0.05 * scale, Math.max(18, 26 * scale), 500)
     : null;
 
   const total = (headFit?.height ?? 0) + (subFit ? gap + subFit.height : 0);
-  let y = valign === "bottom" ? box.y + box.h - total : box.y + (box.h - total) / 2;
+  let y = valign === "bottom" ? layout.y + layout.h - total : layout.y + (layout.h - total) / 2;
   const startY = y;
+  const alignment = spec.textAlign ?? "left";
+  const x = alignment === "center" ? layout.x + layout.w / 2 : alignment === "right" ? layout.x + layout.w : layout.x;
 
   ctx.textBaseline = "top";
-  ctx.textAlign = "left";
+  ctx.textAlign = alignment;
   if (headFit) {
     ctx.font = `800 ${headFit.size}px ${FONT}`;
-    ctx.fillStyle = headColor;
+    ctx.fillStyle = spec.textColor ?? headColor;
     for (const line of headFit.lines) {
-      ctx.fillText(line, box.x, y);
+      ctx.fillText(line, x, y);
       y += headFit.size * LINE_HEIGHT;
     }
   }
   if (subFit) {
     y += gap;
     ctx.font = `500 ${subFit.size}px ${FONT}`;
-    ctx.fillStyle = subColor;
+    ctx.fillStyle = spec.textColor ?? subColor;
     for (const line of subFit.lines) {
-      ctx.fillText(line, box.x, y);
+      ctx.fillText(line, x, y);
       y += subFit.size * LINE_HEIGHT;
     }
   }

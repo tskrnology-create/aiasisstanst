@@ -1,8 +1,6 @@
-// Yapay zekâ arka plan görseli üretimi.
-// Güvenlik: anahtar yalnızca sunucuda; kullanıcı oturumuyla RLS geçerli;
-// saatlik limit image_generations tablosundan sayılır (maliyet kontrolü).
-
-import { createClient } from "@supabase/supabase-js";
+// Yapay zekâ arka plan görseli üretimi; sosyal ağlara otomatik yayın yapılmaz.
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { authenticateRequest, getBusinessById, isUuid } from "@/lib/api-user";
 import { FORMATS, type FormatId } from "@/lib/visual-templates";
 import { DEFAULT_RATIO, isRatioId, readPalette, type RatioId } from "@/lib/brand-palette";
 import {
@@ -12,43 +10,33 @@ import {
   isImageStyle,
 } from "@/lib/image-gen";
 
-// Görsel üretimi 60 sn'ye kadar sürebilir.
 export const maxDuration = 60;
 
 const HOURLY_LIMIT = 10;
 const MAX_TOPIC_LEN = 300;
 
 function json(body: Record<string, unknown>, status = 200) {
-  return Response.json(body, { status });
+  return Response.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
+}
+
+async function releaseReservation(supabase: SupabaseClient, reservationId: string) {
+  const { error } = await supabase.rpc("release_generation", { p_reservation_id: reservationId });
+  if (error) console.error("Görsel üretim rezervasyonu bırakılamadı:", error.code);
 }
 
 export async function POST(request: Request) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !anonKey) return json({ error: "Sunucu ayarları eksik." }, 500);
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
   if (!imageProviderConfigured()) {
     return json({ error: "Görsel servisi henüz yapılandırılmadı (GEMINI_API_KEY)." }, 503);
   }
 
-  // 1) Oturum
-  const auth = request.headers.get("authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (!token) return json({ error: "Giriş yapmanız gerekiyor." }, 401);
-  const supabase = createClient(url, anonKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: userData, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !userData.user) return json({ error: "Oturum geçersiz, tekrar giriş yapın." }, 401);
-
-  // 2) Girdi doğrulama
-  let body: { topic?: unknown; style?: unknown; format?: unknown; ratio?: unknown };
+  let body: { topic?: unknown; style?: unknown; format?: unknown; ratio?: unknown; businessId?: unknown };
   try {
     body = await request.json();
   } catch {
     return json({ error: "Geçersiz istek." }, 400);
   }
-  // Renk oranı: geçersiz veya eksikse tasarım varsayılanına düşer (%70 / %30).
   const ratioId: RatioId = isRatioId(body.ratio) ? body.ratio : DEFAULT_RATIO;
   const topic = typeof body.topic === "string" ? body.topic.trim() : "";
   if (topic.length < 3) return json({ error: "Görsel için bir konu yazın." }, 400);
@@ -60,52 +48,42 @@ export async function POST(request: Request) {
   const format = FORMATS[formatId];
   if (!format) return json({ error: "Geçersiz format." }, 400);
 
-  // 3) İşletme (RLS: yalnızca kendi kaydı)
-  const { data: biz, error: bizError } = await supabase
-    .from("businesses")
-    .select("id, name, industry, brand_colors")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (bizError) return json({ error: "Profil okunamadı." }, 500);
-  if (!biz) return json({ error: "Önce işletme profilinizi kaydedin." }, 400);
+  const { supabase } = auth;
+  if (!isUuid(body.businessId)) return json({ error: "Geçerli bir marka seçimi gerekli." }, 400);
+  const { business, error: businessError } = await getBusinessById(supabase, body.businessId);
+  if (businessError) return json({ error: "Seçili marka profili okunamadı." }, 500);
+  if (!business) return json({ error: "Seçili marka bulunamadı veya bu hesaba ait değil." }, 404);
 
-  // 4) Saatlik limit
-  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count, error: countError } = await supabase
-    .from("image_generations")
-    .select("id", { count: "exact", head: true })
-    .eq("business_id", biz.id)
-    .gte("created_at", since);
-  if (countError) {
-    console.error("image_generations okunamadı:", countError.code);
-    return json(
-      { error: "Kullanım tablosu bulunamadı. Supabase SQL Editor'de schema_v2_image_usage.sql dosyasını çalıştırın." },
-      500
-    );
-  }
-  if ((count ?? 0) >= HOURLY_LIMIT) {
-    return json(
-      { error: `Saatlik görsel üretim sınırına (${HOURLY_LIMIT}) ulaştınız. Biraz sonra tekrar deneyin.` },
-      429
-    );
-  }
-
-  // 5) Üretim
-  const palette = readPalette((biz.brand_colors ?? []) as string[], ratioId);
-  const prompt = buildImagePrompt({
-    businessName: biz.name,
-    industry: biz.industry,
-    topic,
-    style: body.style,
-    palette,
+  const { data: reservationId, error: reserveError } = await supabase.rpc("reserve_generation", {
+    p_business_id: business.id,
+    p_kind: "image",
   });
-  const result = await generateImage(prompt, format.aspect);
-  if (!result.ok) return json({ error: result.message }, 502);
+  if (reserveError) {
+    console.error("Görsel üretim rezervasyonu başarısız:", reserveError.code);
+    return json({ error: "Kullanım sınırı denetlenemedi. schema_v5_workspace_and_manual_publishing.sql migration'ının uygulandığını kontrol edin." }, 500);
+  }
+  if (typeof reservationId !== "string") {
+    return json({ error: `Saatlik görsel üretim sınırına (${HOURLY_LIMIT}) ulaştınız. Biraz sonra tekrar deneyin.` }, 429);
+  }
 
-  // 6) Kullanımı kaydet (başarılı üretimlerde)
-  const { error: logError } = await supabase.from("image_generations").insert({ business_id: biz.id });
-  if (logError) console.error("Kullanım kaydedilemedi:", logError.code);
-
-  return json({ image: `data:${result.mimeType};base64,${result.data}` });
+  let saved = false;
+  try {
+    const palette = readPalette((business.brand_colors ?? []) as string[], ratioId);
+    const prompt = buildImagePrompt({
+      businessName: business.name,
+      industry: business.industry,
+      topic,
+      style: body.style,
+      palette,
+    });
+    const result = await generateImage(prompt, format.aspect);
+    if (!result.ok) return json({ error: result.message }, 502);
+    saved = true;
+    return json({ image: `data:${result.mimeType};base64,${result.data}` });
+  } catch (cause) {
+    console.error("Görsel üretimi başarısız:", cause instanceof Error ? cause.message : "unknown");
+    return json({ error: "Görsel üretimi şu anda tamamlanamadı. Daha sonra tekrar deneyin." }, 502);
+  } finally {
+    if (!saved) await releaseReservation(supabase, reservationId);
+  }
 }

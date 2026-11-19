@@ -4,6 +4,7 @@ export type ContentStatus = "draft" | "approved" | "archived";
 
 export interface ContentRow {
   id: string;
+  business_id: string;
   parent_id: string | null;
   prompt: string;
   tone: string | null;
@@ -14,6 +15,7 @@ export interface ContentRow {
   ad_text: string | null;
   story_text: string | null;
   visual_url: string | null;
+  visual_type: "image" | "video" | "model";
   status: ContentStatus;
   created_at: string;
 }

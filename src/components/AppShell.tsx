@@ -5,10 +5,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
-import { cx } from "./Ui";
+import { BusinessContextProvider, useBusinessContext, type BusinessOption } from "./BusinessContext";
+import { cx, selectClass } from "./Ui";
 import {
   IconBuilding,
   IconCalendar,
@@ -29,6 +30,7 @@ const NAV = [
 ] as const;
 
 const THEME_KEY = "ai-asisst-theme";
+const BUSINESS_SELECTION_KEY = "ai-asisst-active-business";
 
 function Wordmark({ compact = false }: { compact?: boolean }) {
   return (
@@ -124,6 +126,49 @@ function AccountBlock({ vertical }: { vertical: boolean }) {
   );
 }
 
+function BusinessSelector({ compact = false }: { compact?: boolean }) {
+  const session = useSession();
+  const { businesses, activeBusinessId, isBusinessLoading, businessError, selectBusiness } =
+    useBusinessContext();
+
+  if (!session?.user) return null;
+  if (businessError) {
+    return <p role="status" className="px-1 text-xs text-danger">Marka listesi yüklenemedi.</p>;
+  }
+  if (isBusinessLoading) {
+    return <p className="px-1 text-xs text-muted">Markalar yükleniyor…</p>;
+  }
+  if (businesses.length === 0) {
+    return (
+      <Link href="/" className="inline-flex rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand-soft dark:text-brand-strong">
+        İlk markanı oluştur →
+      </Link>
+    );
+  }
+
+  return (
+    <div className={cx("space-y-1.5", compact ? "" : "px-1")}>
+      <label htmlFor={compact ? "active-business-mobile" : "active-business-desktop"} className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
+        Aktif marka
+      </label>
+      <select
+        id={compact ? "active-business-mobile" : "active-business-desktop"}
+        aria-label="Aktif marka"
+        className={cx(selectClass, "w-full truncate py-2 text-xs")}
+        value={activeBusinessId ?? ""}
+        onChange={(event) => selectBusiness(event.target.value)}
+      >
+        {businesses.map((business) => (
+          <option key={business.id} value={business.id}>{business.name}</option>
+        ))}
+      </select>
+      <Link href="/" className="inline-flex px-1 text-[11px] font-medium text-muted hover:text-brand dark:hover:text-brand-strong">
+        + Yeni marka ekle
+      </Link>
+    </div>
+  );
+}
+
 function ManualBadge() {
   return (
     <div className="rounded-xl border border-line bg-surface-2/80 p-3">
@@ -141,14 +186,99 @@ function ManualBadge() {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const current = NAV.find((item) => item.href === pathname);
+  const session = useSession();
+  const userId = session?.user.id ?? null;
+  const [businesses, setBusinesses] = useState<BusinessOption[]>([]);
+  const [activeBusinessId, setActiveBusinessId] = useState<string | null>(null);
+  const [isBusinessLoading, setIsBusinessLoading] = useState(true);
+  const [businessError, setBusinessError] = useState<string | null>(null);
+  const loadRequest = useRef(0);
+
+  const refreshBusinesses = useCallback(async (preferredId?: string) => {
+    const requestId = ++loadRequest.current;
+    if (!userId) {
+      setBusinesses([]);
+      setActiveBusinessId(null);
+      setIsBusinessLoading(false);
+      return;
+    }
+
+    setIsBusinessLoading(true);
+    setBusinessError(null);
+    const { data, error } = await getSupabase()
+      .from("businesses")
+      .select("id, name")
+      .order("created_at", { ascending: true });
+    if (requestId !== loadRequest.current) return;
+    if (error) {
+      setBusinessError(error.message);
+      setBusinesses([]);
+      setActiveBusinessId(null);
+      setIsBusinessLoading(false);
+      return;
+    }
+
+    const nextBusinesses = (data ?? []) as BusinessOption[];
+    setBusinesses(nextBusinesses);
+    let storedId: string | null = null;
+    try {
+      storedId = window.localStorage.getItem(`${BUSINESS_SELECTION_KEY}:${userId}`);
+    } catch {
+      /* localStorage kapalıysa varsayılan markayla devam edilir. */
+    }
+    const nextId = [preferredId, storedId, nextBusinesses[0]?.id].find(
+      (id) => id && nextBusinesses.some((business) => business.id === id)
+    ) ?? null;
+    setActiveBusinessId(nextId);
+    try {
+      if (nextId) window.localStorage.setItem(`${BUSINESS_SELECTION_KEY}:${userId}`, nextId);
+      else window.localStorage.removeItem(`${BUSINESS_SELECTION_KEY}:${userId}`);
+    } catch {
+      /* Tercih oturum boyunca bellekte kalır. */
+    }
+    setIsBusinessLoading(false);
+  }, [userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (!cancelled) return refreshBusinesses();
+      return undefined;
+    });
+    return () => { cancelled = true; };
+  }, [userId, refreshBusinesses]);
+
+  const selectBusiness = useCallback((id: string) => {
+    if (!businesses.some((business) => business.id === id)) return;
+    setActiveBusinessId(id);
+    if (!userId) return;
+    try {
+      window.localStorage.setItem(`${BUSINESS_SELECTION_KEY}:${userId}`, id);
+    } catch {
+      /* Seçim yine de mevcut ekranda uygulanır. */
+    }
+  }, [businesses, userId]);
+
+  const contextValue = {
+    businesses,
+    activeBusinessId,
+    isBusinessLoading,
+    businessError,
+    selectBusiness,
+    refreshBusinesses,
+  };
 
   return (
+    <BusinessContextProvider value={contextValue}>
     <div className="min-h-screen">
       {/* Mobil üst başlık */}
       <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-xl md:hidden">
-        <div className="flex items-center justify-between gap-3 px-4 py-3">
-          <Wordmark />
-          <ThemeToggle />
+        <div className="space-y-2 px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <Wordmark />
+            <ThemeToggle />
+          </div>
+          <BusinessSelector compact />
         </div>
       </header>
 
@@ -157,6 +287,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <Link href="/" className="px-1" aria-label="Aı Asisst ana sayfa">
           <Wordmark />
         </Link>
+        <div className="mt-5">
+          <BusinessSelector />
+        </div>
 
         <nav className="mt-7 flex-1" aria-label="Ana menü">
           <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-faint">
@@ -251,5 +384,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </ul>
       </nav>
     </div>
+    </BusinessContextProvider>
   );
 }

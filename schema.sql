@@ -62,6 +62,7 @@ create table contents (
   ad_text       text,                             -- reklam metni
   story_text    text,                             -- hikâye metni
   visual_url    text,                             -- Modül 3: üretilen/seçilen görsel
+  visual_type   text not null default 'image' check (visual_type in ('image', 'video', 'model')),
   status        content_status not null default 'draft',
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()

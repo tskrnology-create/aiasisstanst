@@ -2,7 +2,7 @@
 -- Supabase SQL Editor'de schema.sql ve schema_v2_image_usage.sql sonrasında çalıştırın.
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('visuals', 'visuals', false, 12582912, array['image/png']::text[])
+values ('visuals', 'visuals', false, 52428800, array['image/png', 'image/jpeg', 'image/webp', 'model/gltf-binary', 'model/gltf+json']::text[])
 on conflict (id) do update
   set public = false,
       file_size_limit = excluded.file_size_limit,

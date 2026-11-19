@@ -11,6 +11,7 @@ create index if not exists image_generations_business_idx
 
 alter table image_generations enable row level security;
 
+drop policy if exists "image_generations: işletme sahibi" on image_generations;
 create policy "image_generations: işletme sahibi" on image_generations
   for all
   using (exists (select 1 from businesses b where b.id = business_id and b.owner_id = auth.uid()))

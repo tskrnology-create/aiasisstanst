@@ -36,6 +36,7 @@ import {
   readPalette,
   suggestSecondary,
 } from "@/lib/brand-palette";
+import { useBusinessContext } from "./BusinessContext";
 
 const MAX_LOGO_BYTES = 500 * 1024; // localStorage sınırı nedeniyle; Supabase'de kalkacak
 
@@ -188,6 +189,26 @@ function BrandColorSlots({
 }
 
 export default function ProfileForm() {
+  const { activeBusinessId, isBusinessLoading, refreshBusinesses } = useBusinessContext();
+  return (
+    <ProfileFormWorkspace
+      key={activeBusinessId ?? "no-brand"}
+      activeBusinessId={activeBusinessId}
+      isBusinessLoading={isBusinessLoading}
+      refreshBusinesses={refreshBusinesses}
+    />
+  );
+}
+
+function ProfileFormWorkspace({
+  activeBusinessId,
+  isBusinessLoading,
+  refreshBusinesses,
+}: {
+  activeBusinessId: string | null;
+  isBusinessLoading: boolean;
+  refreshBusinesses: (preferredId?: string) => Promise<void>;
+}) {
   const [form, setForm] = useState<StoredBusiness>(EMPTY_BUSINESS);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [logoError, setLogoError] = useState<string | null>(null);
@@ -196,16 +217,26 @@ export default function ProfileForm() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [newDraft, setNewDraft] = useState(false);
 
   useEffect(() => {
+    if (isBusinessLoading) return;
+    let active = true;
     businessStore
-      .get()
+      .get(activeBusinessId)
       .then((stored) => {
-        if (stored) setForm({ ...EMPTY_BUSINESS, ...stored });
+        if (!active) return;
+        setForm(stored ? { ...EMPTY_BUSINESS, ...stored } : { ...EMPTY_BUSINESS });
+        setNewDraft(false);
       })
-      .catch((err: Error) => setLoadError("Profil yüklenemedi: " + err.message))
-      .finally(() => setLoaded(true));
-  }, []);
+      .catch((err: Error) => {
+        if (active) setLoadError("Profil yüklenemedi: " + err.message);
+      })
+      .finally(() => {
+        if (active) setLoaded(true);
+      });
+    return () => { active = false; };
+  }, [activeBusinessId, isBusinessLoading]);
 
   function update<K extends keyof StoredBusiness>(key: K, value: StoredBusiness[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -244,7 +275,9 @@ export default function ProfileForm() {
         social_accounts: form.social_accounts.map((a) => ({ ...a, handle: a.handle.trim() })),
       });
       setForm((f) => ({ ...f, id }));
+      setNewDraft(false);
       setSavedAt(new Date());
+      await refreshBusinesses(id);
     } catch (err) {
       setSaveError("Kaydedilemedi: " + (err instanceof Error ? err.message : "bilinmeyen hata"));
     } finally {
@@ -265,6 +298,9 @@ export default function ProfileForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5" noValidate>
+      {newDraft && (
+        <Callout tone="info">Yeni marka taslağı oluşturuluyor. Kaydettiğinizde bu marka aktif çalışma alanı olur.</Callout>
+      )}
       {loadError && (
         <div className="rounded-2xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger">
           {loadError}
@@ -275,6 +311,23 @@ export default function ProfileForm() {
         step="01"
         title="Temel bilgiler"
         description="Bu alanlar yapay zekânın kimin için yazdığını belirler."
+        aside={
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={saving}
+            onClick={() => {
+              setForm({ ...EMPTY_BUSINESS });
+              setErrors({});
+              setLoadError(null);
+              setSavedAt(null);
+              setNewDraft(true);
+            }}
+          >
+            <IconPlus /> Yeni marka
+          </Button>
+        }
       >
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="İşletme adı *" error={errors.name} htmlFor="biz-name">

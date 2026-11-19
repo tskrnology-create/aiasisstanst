@@ -17,7 +17,7 @@
   --ink: #101018;
   --ink-soft: #34343f;
   --muted: #6a6a79;
-  --faint: #9a9aa9;
+  --faint: #686777;
 
   --brand: #6a5cff;
   --brand-strong: #5344e6;
@@ -47,7 +47,7 @@
   --ink: #ecebf3;
   --ink-soft: #c9c7d6;
   --muted: #94919f;
-  --faint: #6e6c7c;
+  --faint: #a3a0ae;
 
   --brand: #8d7cff;
   --brand-strong: #a495ff;
@@ -159,6 +159,12 @@
   :focus-visible {
     outline: 2px solid var(--brand);
     outline-offset: 2px;
+  }
+
+  label:has(input[type="file"]:focus-visible) {
+    outline: 2px solid var(--brand);
+    outline-offset: 3px;
+    border-radius: 0.75rem;
   }
 
   ::-webkit-scrollbar {
