@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
+import { loadImage, postApi } from "@/lib/api-client";
 import { businessStore, type StoredBusiness } from "@/lib/business-store";
 import { STATUS_LABEL, type ContentRow } from "@/lib/library-utils";
 import type { StockPhoto } from "@/lib/stock";
 import {
   FORMATS,
-  TEMPLATES,
   TEMPLATE_USAGE,
   drawVisual,
   type FormatId,
@@ -18,26 +18,18 @@ import {
   DEFAULT_RATIO,
   MAX_PRIMARY_SHARE,
   MIN_PRIMARY_SHARE,
-  percent,
   readPalette,
   type RatioId,
 } from "@/lib/brand-palette";
-import {
-  Button,
-  Callout,
-  Chip,
-  LinkButton,
-  StatusPill,
-  Tag,
-  cx,
-  hintClass,
-  inputClass,
-  selectClass,
-} from "./Ui";
+import { Button, Callout, Chip, LinkButton, Segmented, StatusPill, Tag, cx, hintClass, inputClass, selectClass } from "./Ui";
 import { IconDownload, IconImage, IconLibrary, IconRefresh, IconSparkles, IconWand } from "./Icons";
+import TemplateGallery from "./visual/TemplateGallery";
+import StockPanel from "./visual/StockPanel";
 
 type TextSource = "post_text" | "ad_text" | "story_text" | "caption";
 type Style = "photo" | "illustration" | "abstract";
+type Tab = "content" | "design" | "background";
+type BgMode = "stock" | "upload" | "ai";
 
 const SOURCE_LABEL: Record<TextSource, string> = {
   post_text: "Gönderi metni",
@@ -50,21 +42,20 @@ const STYLE_LABEL: Record<Style, string> = {
   illustration: "İllüstrasyon",
   abstract: "Soyut / minimal",
 };
-
-const TOOLBAR_TEMPLATE_IDS: TemplateId[] = ["gradyan", "serit", "cerceve", "fotograf", "diyagonal", "editorial"];
+const TABS: ReadonlyArray<{ value: Tab; label: string }> = [
+  { value: "content", label: "1 · İçerik" },
+  { value: "design", label: "2 · Tasarım" },
+  { value: "background", label: "3 · Arka plan" },
+];
+const BG_MODES: ReadonlyArray<{ value: BgMode; label: string }> = [
+  { value: "stock", label: "Stok fotoğraf" },
+  { value: "upload", label: "Yükle" },
+  { value: "ai", label: "Yapay zekâ" },
+];
 
 const MAX_HEADLINE = 160;
 const MAX_SUBLINE = 120;
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Görsel yüklenemedi."));
-    img.src = src;
-  });
-}
 
 // Metni görsele uygun kısa bir başlığa çevirir (fazla boşlukları temizler).
 function toHeadline(text: string | null): string {
@@ -88,6 +79,8 @@ export default function VisualCreator() {
   const [ratioId, setRatioId] = useState<RatioId>(DEFAULT_RATIO);
   const [showStorySafeArea, setShowStorySafeArea] = useState(true);
   const [style, setStyle] = useState<Style>("photo");
+  const [tab, setTab] = useState<Tab>("content");
+  const [bgMode, setBgMode] = useState<BgMode>("stock");
 
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
   const [background, setBackground] = useState<HTMLImageElement | null>(null);
@@ -96,11 +89,7 @@ export default function VisualCreator() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Stok fotoğraf (Pexels)
-  const [stockQuery, setStockQuery] = useState("");
-  const [stockResults, setStockResults] = useState<StockPhoto[]>([]);
-  const [stockBusy, setStockBusy] = useState(false);
-  const [stockError, setStockError] = useState<string | null>(null);
+  // Stok fotoğraf atfı (Pexels)
   const [credit, setCredit] = useState<StockPhoto | null>(null);
 
   // Profil ve içerikler
@@ -166,6 +155,22 @@ export default function VisualCreator() {
 
   const selected = contents.find((c) => c.id === contentId) ?? null;
 
+  // Şablon küçük resimleri için ortak çizim bilgisi (yalnızca ilgili değerler değişince yenilenir).
+  const thumbBase = useMemo(
+    () => ({
+      headline,
+      subline,
+      brandName: biz?.name ?? "",
+      colors: biz?.brand_colors ?? [],
+      ratioId,
+      logo: logo && biz?.logo_data_url ? logo : null,
+      logoSize: logo ? { w: logo.naturalWidth, h: logo.naturalHeight } : undefined,
+      background,
+      backgroundSize: background ? { w: background.naturalWidth, h: background.naturalHeight } : undefined,
+    }),
+    [headline, subline, biz, ratioId, logo, background]
+  );
+
   function pickContent(id: string, src: TextSource = source) {
     setContentId(id);
     const c = contents.find((x) => x.id === id);
@@ -182,17 +187,13 @@ export default function VisualCreator() {
     }
     setBusy(true);
     try {
-      const { data } = await getSupabase().auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error("Oturum bulunamadı, tekrar giriş yapın.");
-      const res = await fetch("/api/image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ topic: topic.slice(0, 300), style, format, ratio: ratioId }),
+      const body = await postApi<{ image: string }>("/api/image", {
+        topic: topic.slice(0, 300),
+        style,
+        format,
+        ratio: ratioId,
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error ?? "Görsel üretilemedi.");
-      const img = await loadImage(body.image as string);
+      const img = await loadImage(body.image);
       setBackground(img);
       setTemplate("fotograf");
       setCredit(null);
@@ -201,80 +202,6 @@ export default function VisualCreator() {
       setError(err instanceof Error ? err.message : "Bilinmeyen hata.");
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function callStock(payload: Record<string, unknown>) {
-    const { data } = await getSupabase().auth.getSession();
-    const token = data.session?.access_token;
-    if (!token) throw new Error("Oturum bulunamadı, tekrar giriş yapın.");
-    const res = await fetch("/api/stock", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(payload),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error ?? "İşlem başarısız.");
-    return body;
-  }
-
-  async function searchStock(e?: React.FormEvent) {
-    e?.preventDefault();
-    const query = stockQuery.trim();
-    if (query.length < 2) {
-      setStockError("Aranacak bir kelime yazın.");
-      return;
-    }
-    setStockBusy(true);
-    setStockError(null);
-    try {
-      const body = await callStock({
-        action: "search",
-        query,
-        orientation: format === "post" ? "square" : "portrait",
-      });
-      const photos = (body.photos ?? []) as StockPhoto[];
-      setStockResults(photos);
-      if (photos.length === 0) setStockError("Sonuç bulunamadı. Daha genel bir kelime deneyin.");
-    } catch (err) {
-      setStockError(err instanceof Error ? err.message : "Bilinmeyen hata.");
-    } finally {
-      setStockBusy(false);
-    }
-  }
-
-  async function suggestKeywords() {
-    const topic = (selected?.prompt || headline).trim();
-    if (topic.length < 3) {
-      setStockError("Önce bir içerik seçin veya görseldeki yazıyı girin.");
-      return;
-    }
-    setStockBusy(true);
-    setStockError(null);
-    try {
-      const body = await callStock({ action: "suggest", topic: topic.slice(0, 300) });
-      setStockQuery(body.query as string);
-    } catch (err) {
-      setStockError(err instanceof Error ? err.message : "Bilinmeyen hata.");
-    } finally {
-      setStockBusy(false);
-    }
-  }
-
-  async function pickStock(photo: StockPhoto) {
-    setStockBusy(true);
-    setStockError(null);
-    try {
-      const body = await callStock({ action: "image", url: photo.full });
-      const img = await loadImage(body.image as string);
-      setBackground(img);
-      setTemplate("fotograf");
-      setCredit(photo);
-      setNotice("Fotoğraf eklendi. Yazıyı ve şablonu değiştirebilirsiniz.");
-    } catch (err) {
-      setStockError(err instanceof Error ? err.message : "Bilinmeyen hata.");
-    } finally {
-      setStockBusy(false);
     }
   }
 
@@ -401,19 +328,19 @@ export default function VisualCreator() {
   }
 
   const palette = readPalette(biz.brand_colors, ratioId);
+  const working = busy || saving;
+  const topic = (selected?.prompt || headline).trim();
 
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-      {/* Önizleme */}
+    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,23rem)_minmax(0,1fr)]">
+      {/* Önizleme ve ana eylemler: masaüstünde sabit kalır */}
       <div className="space-y-3 lg:sticky lg:top-6">
         <div className="rounded-2xl border border-line bg-surface/90 p-4 shadow-soft backdrop-blur-sm">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">
-              Canlı önizleme
-            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">Canlı önizleme</p>
             <Tag tone="brand">{FORMATS[format].aspect}</Tag>
           </div>
-          <div className="relative mx-auto w-full max-w-[19rem]">
+          <div className="relative mx-auto w-full max-w-[17rem] sm:max-w-[19rem]">
             <canvas
               ref={canvasRef}
               aria-label="Görsel önizleme"
@@ -431,12 +358,23 @@ export default function VisualCreator() {
               </div>
             )}
           </div>
+          {format === "story" && (
+            <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 text-xs text-muted">
+              <input
+                type="checkbox"
+                checked={showStorySafeArea}
+                onChange={(e) => setShowStorySafeArea(e.target.checked)}
+                className="h-4 w-4 accent-brand"
+              />
+              Güvenli alanı göster (yalnızca önizleme)
+            </label>
+          )}
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <Button type="button" onClick={saveToLibrary} disabled={saving || busy} className="w-full">
+            <Button type="button" onClick={saveToLibrary} disabled={working} className="w-full">
               <IconLibrary />
               {saving ? "Kaydediliyor…" : "Kütüphaneye ekle"}
             </Button>
-            <Button type="button" variant="secondary" onClick={download} disabled={saving || busy} className="w-full">
+            <Button type="button" variant="secondary" onClick={download} disabled={working} className="w-full">
               <IconDownload />PNG indir
             </Button>
           </div>
@@ -454,105 +392,77 @@ export default function VisualCreator() {
               </a>
             </p>
           )}
-          <div className="mt-3 space-y-2">
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2 text-xs text-muted">
-                <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full" style={{ background: palette.primary }} />Ana</span>
-                <span className="font-mono">{percent(palette.share)} / {percent(palette.accent)}</span>
-                <span className="inline-flex items-center gap-1.5">Yardımcı<i className="h-2.5 w-2.5 rounded-full" style={{ background: palette.secondary }} /></span>
-              </div>
-              <div className="flex h-1.5 overflow-hidden rounded-full bg-surface-2">
-                <span style={{ width: `${palette.share * 100}%`, backgroundColor: palette.primary }} />
-                <span style={{ width: `${palette.accent * 100}%`, backgroundColor: palette.secondary }} />
-              </div>
-              <p className={hintClass}>{TEMPLATE_USAGE[template]}</p>
-            </div>
-          </div>
         </div>
         {loadError && <Callout tone="error">{loadError}</Callout>}
       </div>
 
-      {/* Kontroller */}
+      {/* Düzenleme: üç adımlı sekmeler */}
       <section className="rounded-2xl border border-line bg-surface/90 p-5 shadow-soft backdrop-blur-sm sm:p-6">
-        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-ink">Görselini hazırla</h2>
-            <p className="text-sm text-muted">Metni seç, görünümü düzenle ve tek tıkla kütüphanene kaydet.</p>
-          </div>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <Segmented value={tab} onChange={setTab} options={TABS} ariaLabel="Düzenleme adımı" />
           <LinkButton href="/uret" size="sm" variant="ghost">
             <IconSparkles className="h-3.5 w-3.5" />Yeni içerik
           </LinkButton>
         </div>
 
-        <div className="space-y-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-faint">İçerik</p>
-          {contents.length === 0 ? (
-            <Callout tone="info">
-              Henüz içeriğiniz yok.{" "}
-              <Link href="/uret" className="font-semibold underline underline-offset-2">
-                Önce içerik üretin →
-              </Link>{" "}
-              Dilerseniz yazıyı aşağıya kendiniz de girebilirsiniz.
-            </Callout>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
-              <div className="space-y-1.5">
-                <label htmlFor="vis-content" className="text-sm font-medium text-ink">
-                  İçerik
-                </label>
-                <select
-                  id="vis-content"
-                  className={selectClass}
-                  value={contentId}
-                  onChange={(e) => pickContent(e.target.value)}
-                >
-                  <option value="">İçerik seçin…</option>
-                  {contents.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      [{STATUS_LABEL[c.status]}] {c.prompt.slice(0, 60)}
-                      {c.tone ? ` · ${c.tone}` : ""}
-                    </option>
-                  ))}
-                </select>
+        {tab === "content" && (
+          <div className="space-y-4">
+            {contents.length === 0 ? (
+              <Callout tone="info">
+                Henüz içeriğiniz yok.{" "}
+                <Link href="/uret" className="font-semibold underline underline-offset-2">
+                  Önce içerik üretin →
+                </Link>{" "}
+                Dilerseniz yazıyı aşağıya kendiniz de girebilirsiniz.
+              </Callout>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
+                <div className="space-y-1.5">
+                  <label htmlFor="vis-content" className="text-sm font-medium text-ink">İçerik</label>
+                  <select
+                    id="vis-content"
+                    className={selectClass}
+                    value={contentId}
+                    onChange={(e) => pickContent(e.target.value)}
+                  >
+                    <option value="">İçerik seçin…</option>
+                    {contents.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        [{STATUS_LABEL[c.status]}] {c.prompt.slice(0, 60)}
+                        {c.tone ? ` · ${c.tone}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="vis-source" className="text-sm font-medium text-ink">Yazı kaynağı</label>
+                  <select
+                    id="vis-source"
+                    className={selectClass}
+                    value={source}
+                    onChange={(e) => {
+                      const sc = e.target.value as TextSource;
+                      setSource(sc);
+                      if (contentId) pickContent(contentId, sc);
+                    }}
+                  >
+                    {(Object.keys(SOURCE_LABEL) as TextSource[]).map((k) => (
+                      <option key={k} value={k}>{SOURCE_LABEL[k]}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label htmlFor="vis-source" className="text-sm font-medium text-ink">
-                  Yazı kaynağı
-                </label>
-                <select
-                  id="vis-source"
-                  className={selectClass}
-                  value={source}
-                  onChange={(e) => {
-                    const s = e.target.value as TextSource;
-                    setSource(s);
-                    if (contentId) pickContent(contentId, s);
-                  }}
-                >
-                  {(Object.keys(SOURCE_LABEL) as TextSource[]).map((s) => (
-                    <option key={s} value={s}>
-                      {SOURCE_LABEL[s]}
-                    </option>
-                  ))}
-                </select>
+            )}
+            {selected && (
+              <div className="flex items-center gap-2">
+                <StatusPill status={selected.status} />
+                <p className="truncate text-xs text-muted">{selected.prompt}</p>
               </div>
-            </div>
-          )}
-
-          {selected && (
-            <div className="mt-3 flex items-center gap-2">
-              <StatusPill status={selected.status} />
-              <p className="truncate text-xs text-muted">{selected.prompt}</p>
-            </div>
-          )}
-
-          <div className="mt-5 space-y-4">
+            )}
             <label className="block space-y-1.5">
               <span className="flex items-center justify-between text-sm font-medium text-ink">
                 Görseldeki yazı
-                <span className="font-mono text-[11px] text-faint">
-                  {headline.length}/{MAX_HEADLINE}
-                </span>
+                <span className="font-mono text-[11px] text-faint">{headline.length}/{MAX_HEADLINE}</span>
               </span>
               <textarea
                 className={cx(inputClass, "resize-y")}
@@ -573,233 +483,162 @@ export default function VisualCreator() {
                 placeholder="Örn. 30 Kasım'a kadar geçerli"
               />
             </label>
+            <div className="flex justify-end">
+              <Button type="button" variant="soft" onClick={() => setTab("design")}>Tasarıma geç →</Button>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="space-y-5 border-t border-line pt-5">
-          <div>
-            <h3 className="text-sm font-semibold text-ink">Görünüm</h3>
-            <p className="mt-1 text-xs text-muted">Şablon, format ve marka rengi dengesini ayarlayın.</p>
-          </div>
-          <div className="space-y-5">
-            <div className="space-y-1.5">
-              <label htmlFor="vis-format" className="text-sm font-medium text-ink">
-                Format
-              </label>
-              <select
-                id="vis-format"
-                className={selectClass}
-                value={format}
-                onChange={(e) => setFormat(e.target.value as FormatId)}
-              >
+        {tab === "design" && (
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-ink">Format</p>
+              <div role="group" aria-label="Format" className="flex flex-wrap gap-2">
                 {(Object.keys(FORMATS) as FormatId[]).map((f) => (
-                  <option key={f} value={f}>
-                    {FORMATS[f].label}
-                  </option>
+                  <Chip key={f} active={format === f} onClick={() => setFormat(f)} title={FORMATS[f].label}>
+                    {FORMATS[f].aspect} · {FORMATS[f].label.split(" (")[0]}
+                  </Chip>
                 ))}
-              </select>
+              </div>
               <p className={hintClass}>
-                Bunlar indirme ölçüleridir; paylaşmadan önce hedef platformun güncel kırpma ve güvenli alanını kontrol edin.
+                İndirme ölçüsüdür; paylaşmadan önce platformun güncel kırpma ve güvenli alanını kontrol edin.
               </p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-ink">Şablon</p>
+              <TemplateGallery value={template} onChange={setTemplate} format={format} base={thumbBase} />
+              <p className={hintClass}>{TEMPLATE_USAGE[template]}</p>
+              {template === "fotograf" && !background && (
+                <Callout tone="info">
+                  Bu şablon bir arka plan fotoğrafı ister.{" "}
+                  <button type="button" className="font-semibold underline" onClick={() => setTab("background")}>
+                    Arka plan ekle →
+                  </button>
+                </Callout>
+              )}
             </div>
 
             <div className="space-y-2.5">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-medium text-ink">Marka rengi dengesi</p>
-                <span className="rounded-full bg-surface-2 px-2.5 py-1 font-mono text-xs font-semibold text-ink">
+                <span className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-2.5 py-1 font-mono text-xs font-semibold text-ink">
+                  <i className="h-3 w-3 rounded-full border border-white/70" style={{ backgroundColor: palette.primary }} />
                   %{ratioId} <span className="text-faint">/</span> %{100 - ratioId}
+                  <i className="h-3 w-3 rounded-full border border-white/70" style={{ backgroundColor: palette.secondary }} />
                 </span>
               </div>
-              <div className="rounded-2xl border border-line bg-surface-2/60 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="h-8 w-8 shrink-0 rounded-xl border border-white/70 shadow-sm" style={{ backgroundColor: palette.primary }} />
-                    <span className="min-w-0">
-                      <span className="block text-[11px] font-medium text-muted">Ana renk</span>
-                      <span className="block font-mono text-xs font-semibold text-ink">%{ratioId}</span>
-                    </span>
-                  </div>
-                  <div className="flex min-w-0 items-center gap-2.5 text-right">
-                    <span className="min-w-0">
-                      <span className="block text-[11px] font-medium text-muted">Yardımcı</span>
-                      <span className="block font-mono text-xs font-semibold text-ink">%{100 - ratioId}</span>
-                    </span>
-                    <span className="h-8 w-8 shrink-0 rounded-xl border border-white/70 shadow-sm" style={{ backgroundColor: palette.secondary }} />
-                  </div>
-                </div>
-                <label htmlFor="vis-ratio" className="sr-only">Ana rengin kullanım oranı</label>
-                <input
-                  id="vis-ratio"
-                  type="range"
-                  min={MIN_PRIMARY_SHARE}
-                  max={MAX_PRIMARY_SHARE}
-                  step={1}
-                  value={ratioId}
-                  onChange={(e) => setRatioId(Number(e.target.value))}
-                  aria-valuetext={`Ana renk yüzde ${ratioId}, yardımcı renk yüzde ${100 - ratioId}`}
-                  className="brand-ratio-slider w-full"
-                  style={{
-                    background: `linear-gradient(to right, ${palette.primary} 0%, ${palette.primary} ${ratioId}%, ${palette.secondary} ${ratioId}%, ${palette.secondary} 100%)`,
+              <label htmlFor="vis-ratio" className="sr-only">Ana rengin kullanım oranı</label>
+              <input
+                id="vis-ratio"
+                type="range"
+                min={MIN_PRIMARY_SHARE}
+                max={MAX_PRIMARY_SHARE}
+                step={1}
+                value={ratioId}
+                onChange={(e) => setRatioId(Number(e.target.value))}
+                aria-valuetext={`Ana renk yüzde ${ratioId}, yardımcı renk yüzde ${100 - ratioId}`}
+                className="brand-ratio-slider w-full"
+                style={{
+                  background: `linear-gradient(to right, ${palette.primary} 0%, ${palette.primary} ${ratioId}%, ${palette.secondary} ${ratioId}%, ${palette.secondary} 100%)`,
+                }}
+              />
+              <p className={hintClass}>Renkleri profil sayfasından değiştirebilirsiniz.</p>
+            </div>
+            <div className="flex justify-end">
+              <Button type="button" variant="soft" onClick={() => setTab("background")}>Arka plana geç →</Button>
+            </div>
+          </div>
+        )}
+
+        {tab === "background" && (
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Segmented value={bgMode} onChange={setBgMode} options={BG_MODES} ariaLabel="Arka plan kaynağı" />
+              {background && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setBackground(null);
+                    setCredit(null);
+                    setNotice(null);
                   }}
-                />
-                <div className="mt-2 flex items-center justify-between text-[10px] font-medium text-muted">
-                  <span>50 / 50</span><span>Her adım %1</span><span>90 / 10</span>
-                </div>
-              </div>
-              <p className={hintClass}>Kaydırdıkça önizleme ve AI arka plan paleti anında güncellenir.</p>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-ink">Şablon araç çubuğu</p>
-              <div role="group" aria-label="Görsel stili" className="flex flex-wrap gap-2">
-                {TOOLBAR_TEMPLATE_IDS.map((id) => {
-                  const item = TEMPLATES.find((entry) => entry.id === id);
-                  if (!item) return null;
-                  return <Chip key={id} active={template === id} onClick={() => setTemplate(id)}>{item.label}</Chip>;
-                })}
-              </div>
-              <details className="group rounded-xl border border-line bg-surface-2/50 px-3.5 py-2.5">
-                <summary className="cursor-pointer list-none text-xs font-semibold text-muted marker:hidden">
-                  <span className="inline-flex items-center gap-2">Diğer şablonlar <span className="rounded-full bg-surface px-2 py-0.5 font-mono">{TEMPLATES.length - TOOLBAR_TEMPLATE_IDS.length}</span><span className="text-faint transition group-open:rotate-90">›</span></span>
-                </summary>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {TEMPLATES.filter((item) => !TOOLBAR_TEMPLATE_IDS.includes(item.id)).map((item) => (
-                    <Chip key={item.id} active={template === item.id} onClick={() => setTemplate(item.id)}>{item.label}</Chip>
-                  ))}
-                </div>
-              </details>
-              {template === "fotograf" && !background && (
-                <p className={hintClass}>
-                  &quot;Fotoğraflı&quot; temel şablon için aşağıdan arka plan ekleyin; yoksa gradyan
-                  yedek olarak gösterilir. Yeni kompozisyonlar yüklenen/üretilen fotoğrafın üstüne de uygulanabilir.
-                </p>
-              )}
-              {format === "story" && (
-                <label className="flex cursor-pointer items-center gap-2 text-xs text-muted">
-                  <input
-                    type="checkbox"
-                    checked={showStorySafeArea}
-                    onChange={(e) => setShowStorySafeArea(e.target.checked)}
-                    className="h-4 w-4 accent-brand"
-                  />
-                  Hikâyede platform arayüzü için güvenli alanı göster (yalnızca önizleme)
-                </label>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4 border-t border-line pt-5">
-          <div>
-            <h3 className="text-sm font-semibold text-ink">Arka plan görseli</h3>
-            <p className="mt-1 text-xs text-muted">İstersen ücretsiz stok fotoğraf seç, kendi fotoğrafını yükle veya AI ile yazısız arka plan oluştur.</p>
-          </div>
-          <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-end">
-              <div className="space-y-1.5">
-                <label htmlFor="vis-style" className="text-sm font-medium text-ink">
-                  Stil
-                </label>
-                <select
-                  id="vis-style"
-                  className={selectClass}
-                  value={style}
-                  onChange={(e) => setStyle(e.target.value as Style)}
                 >
-                  {(Object.keys(STYLE_LABEL) as Style[]).map((s) => (
-                    <option key={s} value={s}>
-                      {STYLE_LABEL[s]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" onClick={generateBackground} disabled={busy || saving}>
-                  {busy ? <IconRefresh className="animate-spin" /> : <IconWand />}
-                  {busy ? "Üretiliyor…" : "Yapay zekâyla üret"}
+                  Arka planı kaldır
                 </Button>
+              )}
+            </div>
+
+            {bgMode === "stock" && (
+              <StockPanel
+                format={format}
+                topic={topic}
+                disabled={working}
+                onPick={(img, photo) => {
+                  setBackground(img);
+                  setTemplate("fotograf");
+                  setCredit(photo);
+                  setError(null);
+                  setNotice("Fotoğraf eklendi. Şablonu Tasarım sekmesinden değiştirebilirsiniz.");
+                }}
+              />
+            )}
+
+            {bgMode === "upload" && (
+              <div className="space-y-3">
                 <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-line bg-surface px-4 text-sm font-medium text-ink transition hover:border-line-strong hover:bg-surface-2">
                   <IconImage className="h-4 w-4 text-muted" />
-                  Fotoğraf yükle
+                  Fotoğraf seç
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
                     onChange={onUpload}
-                    disabled={busy || saving}
+                    disabled={working}
                     className="sr-only"
                   />
                 </label>
-                {background && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setBackground(null);
-                      setCredit(null);
-                      setNotice(null);
-                    }}
-                  >
-                    Kaldır
-                  </Button>
-                )}
+                <p className={hintClass}>PNG, JPG veya WebP · en fazla 4 MB. Fotoğraf cihazınızdan çıkmaz, yalnızca önizlemede kullanılır.</p>
               </div>
-            </div>
+            )}
 
-            <div className="space-y-3 rounded-xl border border-line p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-sm font-semibold text-ink">Ücretsiz stok fotoğraf</h4>
-                <a
-                  href="https://www.pexels.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-muted underline underline-offset-4"
-                >
-                  Fotoğraflar Pexels&apos;ten
-                </a>
-              </div>
-              <form onSubmit={searchStock} className="flex flex-wrap gap-2">
-                <input
-                  className={selectClass + " min-w-0 flex-1"}
-                  value={stockQuery}
-                  onChange={(e) => setStockQuery(e.target.value)}
-                  maxLength={100}
-                  placeholder="Örn. autumn sale (İngilizce daha iyi sonuç verir)"
-                  aria-label="Fotoğraf ara"
-                />
-                <Button type="submit" variant="secondary" disabled={stockBusy || saving}>
-                  Ara
-                </Button>
-                <Button type="button" variant="secondary" disabled={stockBusy || saving} onClick={suggestKeywords}>
-                  İçeriğe göre öner
-                </Button>
-              </form>
-              {stockBusy && <p className={hintClass}>Bekleyin…</p>}
-              {stockError && <Callout tone="error">{stockError}</Callout>}
-              {stockResults.length > 0 && (
-                <div className="grid grid-cols-3 gap-2" role="list" aria-label="Fotoğraf sonuçları">
-                  {stockResults.map((ph) => (
-                    <button
-                      key={ph.id}
-                      type="button"
-                      role="listitem"
-                      disabled={stockBusy || saving}
-                      onClick={() => pickStock(ph)}
-                      className="overflow-hidden rounded-lg border border-line hover:border-line-strong disabled:opacity-60"
-                      title={`${ph.photographer} / Pexels`}
+            {bgMode === "ai" && (
+              <div className="space-y-3">
+                <Callout tone="info">
+                  Yapay zekâ görseli Gemini&apos;nin görsel özelliğini kullanır; ücretsiz planda kota dolu olabilir. Hata alırsanız stok fotoğrafı deneyin.
+                </Callout>
+                <div className="grid gap-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-end">
+                  <div className="space-y-1.5">
+                    <label htmlFor="vis-style" className="text-sm font-medium text-ink">Stil</label>
+                    <select
+                      id="vis-style"
+                      className={selectClass}
+                      value={style}
+                      onChange={(e) => setStyle(e.target.value as Style)}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={ph.thumb} alt={ph.alt || "Stok fotoğraf"} className="aspect-square w-full object-cover" />
-                    </button>
-                  ))}
+                      {(Object.keys(STYLE_LABEL) as Style[]).map((k) => (
+                        <option key={k} value={k}>{STYLE_LABEL[k]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Button type="button" onClick={generateBackground} disabled={working}>
+                      {busy ? <IconRefresh className="animate-spin" /> : <IconWand />}
+                      {busy ? "Üretiliyor…" : "Yapay zekâyla üret"}
+                    </Button>
+                  </div>
                 </div>
-              )}
-            </div>
-
+                <p className={hintClass}>
+                  AI görselleri görünmez SynthID işareti içerebilir. Saatte 10 üretim sınırı vardır.
+                </p>
+              </div>
+            )}
             <p className={hintClass}>
-              AI üretimi görseller görünmez SynthID işareti içerebilir. Kütüphaneye kaydedilen PNG özel tutulur ve yalnızca işletme hesabınızdan açılır.
+              Kütüphaneye kaydedilen PNG özel tutulur ve yalnızca işletme hesabınızdan açılır.
             </p>
           </div>
-        </div>
+        )}
       </section>
     </div>
   );
