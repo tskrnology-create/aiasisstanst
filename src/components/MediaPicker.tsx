@@ -161,7 +161,8 @@ export default function MediaPicker({
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? "Fotoğraf kütüphaneye eklenemedi.");
+        const base = data.error ?? "Fotoğraf kütüphaneye eklenemedi.";
+        throw new Error(data.code ? `${base} (Hata kodu: ${data.code})` : base);
       }
       const recordId = response.headers.get("X-Content-Id");
       if (!recordId) throw new Error("Kütüphane kaydı için kimlik dönmedi.");
