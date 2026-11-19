@@ -87,6 +87,7 @@ export async function POST(request: Request) {
     contentType: "model/gltf-binary",
     upsert: false,
   });
+  if (uploadError) console.error("3D model depoya yüklenemedi:", uploadError.message);
   if (uploadError) return json({ error: "3D model kaydedilemedi. Lütfen daha sonra tekrar deneyin." }, 500);
 
   const safeName = file.name.replace(/[\r\n\u0000-\u001f]/g, " ").slice(0, 200);

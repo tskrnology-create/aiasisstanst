@@ -118,6 +118,7 @@ export async function POST(request: Request) {
       upsert: false,
     });
     if (uploadError) {
+      console.error("Pixabay görseli depoya yüklenemedi (schema_v3/v4 çalıştırıldı mı?):", uploadError.message);
       return json({ error: "Görsel kaydedilemedi. Lütfen daha sonra tekrar deneyin." }, 500);
     }
 
