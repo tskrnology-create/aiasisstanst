@@ -1,4 +1,4 @@
-import { authenticateRequest, getBusinessById, isUuid } from "@/lib/api-user";
+import { authenticateRequest, getBusinessById, isUuid, removeVisual, storageErrorCode, uploadVisual } from "@/lib/api-user";
 
 const PIXABAY_API = "https://pixabay.com/api/";
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
@@ -113,24 +113,13 @@ export async function POST(request: Request) {
 
     const extension = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
     const path = `${business.id}/${crypto.randomUUID()}-${id}.${extension}`;
-    const { error: uploadError } = await supabase.storage.from("visuals").upload(path, bytes, {
-      contentType: mime,
-      upsert: false,
-    });
-    if (uploadError) {
-      console.error("Pixabay görseli depoya yüklenemedi (schema_v3/v4 çalıştırıldı mı?):", uploadError.message);
-      // Teknik ayrıntı yerine kısa bir hata kodu döner; destek/geliştirici bununla sebebi bulur.
-      const reason = `${uploadError.message ?? ""}`.toLowerCase();
-      const code = /bucket not found|not found/.test(reason)
-        ? "DEPO_YOK"
-        : /row-level security|policy|unauthorized|not authorized|permission/.test(reason)
-          ? "DEPO_IZIN"
-          : /mime|not supported|invalid/.test(reason)
-            ? "DEPO_TUR"
-            : /size|too large|exceed/.test(reason)
-              ? "DEPO_BOYUT"
-              : "DEPO_DIGER";
-      return json({ error: "Görsel kaydedilemedi. Lütfen daha sonra tekrar deneyin.", code }, 500);
+    const uploaded = await uploadVisual(request, path, bytes, mime);
+    if (!uploaded.ok) {
+      console.error("Pixabay görseli depoya yüklenemedi:", uploaded.status, uploaded.message);
+      return json(
+        { error: "Görsel kaydedilemedi. Lütfen daha sonra tekrar deneyin.", code: storageErrorCode(uploaded) },
+        500
+      );
     }
 
     const creator = (hit.user ?? "Pixabay katkıcısı").replace(/[\r\n\u0000-\u001f]/g, " ").slice(0, 100);
@@ -157,7 +146,7 @@ export async function POST(request: Request) {
 
     if (insertError || !row) {
       console.error("Pixabay içerik kaydı eklenemedi:", insertError?.message);
-      await supabase.storage.from("visuals").remove([path]);
+      await removeVisual(request, path);
       const missingColumn = /visual_type|column|schema cache/i.test(insertError?.message ?? "");
       return json(
         {

@@ -1,4 +1,4 @@
-import { authenticateRequest, getBusinessById, isUuid } from "@/lib/api-user";
+import { authenticateRequest, getBusinessById, isUuid, removeVisual, storageErrorCode, uploadVisual } from "@/lib/api-user";
 import { validateGlb } from "@/lib/glb-validation";
 
 const MAX_MODEL_BYTES = 50 * 1024 * 1024;
@@ -83,12 +83,11 @@ export async function POST(request: Request) {
   if (!business) return json({ error: "Seçili marka bulunamadı veya bu hesaba ait değil." }, 404);
 
   const path = `${business.id}/${crypto.randomUUID()}.glb`;
-  const { error: uploadError } = await supabase.storage.from("visuals").upload(path, bytes, {
-    contentType: "model/gltf-binary",
-    upsert: false,
-  });
-  if (uploadError) console.error("3D model depoya yüklenemedi:", uploadError.message);
-  if (uploadError) return json({ error: "3D model kaydedilemedi. Lütfen daha sonra tekrar deneyin." }, 500);
+  const uploaded = await uploadVisual(request, path, bytes, "model/gltf-binary");
+  if (!uploaded.ok) {
+    console.error("3D model depoya yüklenemedi:", uploaded.status, uploaded.message);
+    return json({ error: "3D model kaydedilemedi. Lütfen daha sonra tekrar deneyin.", code: storageErrorCode(uploaded) }, 500);
+  }
 
   const safeName = file.name.replace(/[\r\n\u0000-\u001f]/g, " ").slice(0, 200);
   const { data: row, error: insertError } = await supabase
@@ -112,7 +111,7 @@ export async function POST(request: Request) {
     .single();
 
   if (insertError || !row) {
-    await supabase.storage.from("visuals").remove([path]);
+    await removeVisual(request, path);
     return json({ error: "3D model yüklendi ancak kütüphane kaydı oluşturulamadı." }, 500);
   }
 
