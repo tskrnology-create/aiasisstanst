@@ -14,6 +14,7 @@ import {
   IconBuilding,
   IconCalendar,
   IconImage,
+  IconLayers,
   IconLibrary,
   IconLogout,
   IconMoon,
@@ -22,7 +23,8 @@ import {
 } from "./Icons";
 
 const NAV = [
-  { href: "/", label: "Marka", short: "Marka", icon: IconBuilding, description: "İşletme profili" },
+  { href: "/", label: "Panel", short: "Panel", icon: IconLayers, description: "Genel bakış" },
+  { href: "/profil", label: "Marka", short: "Marka", icon: IconBuilding, description: "İşletme profili" },
   { href: "/uret", label: "İçerik üret", short: "Üret", icon: IconSparkles, description: "Yapay zekâ metinleri" },
   { href: "/gorsel", label: "Görsel", short: "Görsel", icon: IconImage, description: "Tasarım stüdyosu" },
   { href: "/takvim", label: "Takvim", short: "Takvim", icon: IconCalendar, description: "Paylaşım planı" },
@@ -140,7 +142,7 @@ function BusinessSelector({ compact = false }: { compact?: boolean }) {
   }
   if (businesses.length === 0) {
     return (
-      <Link href="/" className="inline-flex rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand-soft dark:text-brand-strong">
+      <Link href="/profil" className="inline-flex rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand-soft dark:text-brand-strong">
         İlk markanı oluştur →
       </Link>
     );
@@ -162,7 +164,7 @@ function BusinessSelector({ compact = false }: { compact?: boolean }) {
           <option key={business.id} value={business.id}>{business.name}</option>
         ))}
       </select>
-      <Link href="/" className="inline-flex px-1 text-[11px] font-medium text-muted hover:text-brand dark:hover:text-brand-strong">
+      <Link href="/profil" className="inline-flex px-1 text-[11px] font-medium text-muted hover:text-brand dark:hover:text-brand-strong">
         + Yeni marka ekle
       </Link>
     </div>

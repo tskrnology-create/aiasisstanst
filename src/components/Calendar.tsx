@@ -599,7 +599,7 @@ export default function Calendar() {
     return (
       <Callout tone="warning">
         Takvimi kullanmak için önce{" "}
-        <Link href="/" className="font-semibold underline underline-offset-2">
+        <Link href="/profil" className="font-semibold underline underline-offset-2">
           işletme profilinizi kaydedin →
         </Link>
       </Callout>
