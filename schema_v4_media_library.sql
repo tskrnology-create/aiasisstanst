@@ -1,4 +1,4 @@
--- İçerik medyası: Pixabay fotoğrafları, video bağlantıları ve GLB modelleri.
+-- İçerik medyası: özel depoda Pixabay fotoğrafları, videolar ve GLB modelleri.
 -- schema.sql + schema_v3_visual_storage.sql sonrasında çalıştırın.
 
 alter table public.contents
@@ -26,7 +26,7 @@ values (
   'visuals',
   false,
   52428800,
-  array['image/png', 'image/jpeg', 'image/webp', 'model/gltf-binary', 'model/gltf+json']::text[]
+  array['image/png', 'image/jpeg', 'image/webp', 'video/mp4', 'video/webm', 'model/gltf-binary', 'model/gltf+json']::text[]
 )
 on conflict (id) do update
   set public = false,

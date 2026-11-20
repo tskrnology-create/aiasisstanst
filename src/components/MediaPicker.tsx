@@ -5,6 +5,7 @@ import { getSupabase } from "@/lib/supabase";
 import type { StoredBusiness } from "@/lib/business-store";
 import type { ContentRow } from "@/lib/library-utils";
 import { DEFAULT_RATIO, readPalette } from "@/lib/brand-palette";
+import { validateGlb } from "@/lib/glb-validation";
 import { snapshotModel } from "@/lib/model-snapshot";
 import { Button, Callout, cx, inputClass } from "./Ui";
 
@@ -25,7 +26,6 @@ type VideoHit = {
   user: string;
   duration: number;
   thumbnailURL: string;
-  videoURL: string;
   width: number;
   height: number;
 };
@@ -62,9 +62,7 @@ export default function MediaPicker({
   disabled = false,
 }: {
   business: Pick<StoredBusiness, "id" | "content_language">;
-  /** Marka renkleri (3D önizleme zemini için) */
   colors?: string[];
-  /** Seçili formatın piksel ölçüsü (3D önizleme karesi için) */
   snapshotSize?: { width: number; height: number };
   onImageSelected: (image: HTMLImageElement) => void;
   onContentSaved: (row: ContentRow) => void;
@@ -194,43 +192,23 @@ export default function MediaPicker({
     setError(null);
     setNotice(null);
     try {
-      // 1) Videonun kapak karesi arka plan olur (sunucu üzerinden, tuval bozulmasın diye).
       const token = await getToken();
-      const frameResponse = await fetch("/api/media/pixabay/frame", {
+      const response = await fetch("/api/media/pixabay/use-video", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ id: hit.id }),
+        body: JSON.stringify({ id: hit.id, businessId: business.id }),
       });
-      if (!frameResponse.ok) {
-        const frameError = await frameResponse.json().catch(() => ({}));
-        throw new Error(frameError.error ?? "Videonun kapak karesi alınamadı.");
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const base = data.error ?? "Video kütüphaneye eklenemedi.";
+        throw new Error(data.code ? `${base} (Hata kodu: ${data.code})` : base);
       }
-      const frameImage = await imageFromBlob(await frameResponse.blob());
-
-      // 2) Video kütüphaneye eklenir.
-      const { data, error: insertError } = await getSupabase()
-        .from("contents")
-        .insert({
-          business_id: business.id,
-          parent_id: null,
-          prompt: `Pixabay video · ${hit.tags}`.slice(0, 500),
-          tone: null,
-          language: business.content_language,
-          post_text: null,
-          caption: `Pixabay · ${hit.user}\nKaynak: ${hit.pageURL}`,
-          hashtags: [],
-          ad_text: null,
-          story_text: null,
-          visual_url: hit.videoURL,
-          visual_type: "video",
-          status: "draft",
-        })
-        .select("*")
-        .single();
-      if (insertError || !data) throw new Error(`Video kaydedilemedi: ${insertError?.message ?? "kayıt oluşturulamadı"}`);
-      onImageSelected(frameImage);
-      onContentSaved(data as ContentRow);
-      setNotice("Videonun kapak karesi arka plan yapıldı ve video kütüphaneye eklendi. Paylaşım yine manuel yapılır.");
+      const recordId = response.headers.get("X-Content-Id");
+      if (!recordId) throw new Error("Kütüphane kaydı için kimlik dönmedi.");
+      const poster = await imageFromBlob(await response.blob());
+      onImageSelected(poster);
+      await refreshSavedRow(recordId);
+      setNotice("Pixabay videosu özel depoya ve kütüphaneye eklendi; önizleme karesi arka plan olarak kullanılıyor.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Video kaydedilemedi.");
     } finally {
@@ -281,24 +259,23 @@ export default function MediaPicker({
     setBusyId("model");
     setError(null);
     setNotice(null);
-    let snapshotFailed = false;
     try {
-      // 1) Modelin tek karelik önizlemesi arka plan olur (cihazda üretilir).
+      const fileBytes = new Uint8Array(await file.arrayBuffer());
+      if (!validateGlb(fileBytes)) {
+        throw new Error("Model geçerli bir tek dosyalı GLB v2 değil veya harici doku/URL içeriyor.");
+      }
+      let preview: HTMLImageElement | null = null;
       try {
         const palette = readPalette(colors, DEFAULT_RATIO);
-        const snapshot = await snapshotModel(file, {
+        preview = await snapshotModel(file, {
           width: snapshotSize.width,
           height: snapshotSize.height,
           primary: palette.primary,
           secondary: palette.secondary,
         });
-        onImageSelected(snapshot);
-      } catch (snapshotError) {
-        console.error("3D önizleme karesi alınamadı:", snapshotError);
-        snapshotFailed = true;
+      } catch (cause) {
+        console.info("Bu cihazda WebGL 3B poster karesi oluşturulamadı; model kütüphaneye kaydedilecek.", cause);
       }
-
-      // 2) Model özel depoya ve kütüphaneye eklenir.
       const token = await getToken();
       const form = new FormData();
       form.append("file", file, file.name);
@@ -312,14 +289,13 @@ export default function MediaPicker({
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error ?? "3D model eklenemedi.");
       if (typeof data.id !== "string" && typeof data.id !== "number") throw new Error("Model kaydedildi ancak kütüphane kimliği dönmedi.");
+      if (preview) onImageSelected(preview);
       await refreshSavedRow(String(data.id));
       setModelFile(null);
       if (modelInputRef.current) modelInputRef.current.value = "";
-      setNotice(
-        snapshotFailed
-          ? "3D model kütüphaneye eklendi, ancak önizleme karesi arka plan yapılamadı."
-          : "3D modelin önizleme karesi arka plan yapıldı ve model kütüphaneye eklendi."
-      );
+      setNotice(preview
+        ? "Doğrulanmış GLB modeli özel depoya ve kütüphaneye eklendi; model karesi arka plan olarak kullanılıyor."
+        : "Doğrulanmış GLB modeli özel depoya ve kütüphaneye eklendi. Bu cihazda WebGL önizlemesi oluşturulamadığından arka plan karesi uygulanamadı.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "3D model kütüphaneye kaydedilemedi.");
     } finally {
@@ -331,7 +307,7 @@ export default function MediaPicker({
     <section className="space-y-4 rounded-2xl border border-line bg-surface-2/40 p-4 sm:p-5">
       <div>
         <h3 className="text-sm font-semibold text-ink">Stok medya ekle</h3>
-        <p className="mt-1 text-xs text-muted">Pixabay fotoğraf/video ara; seçtiklerini kütüphaneye ekle.</p>
+        <p className="mt-1 text-xs text-muted">Pixabay fotoğraf/video ara veya 3B model ekle; seçilen medya kütüphaneye kaydedilir ve görsel kompozisyonuna uygulanır.</p>
         <p role="status" className="mt-2 inline-flex rounded-full border border-brand/20 bg-brand/5 px-2.5 py-1 text-[11px] font-semibold text-brand">Fotoğraf ve video kaynağı: Pixabay</p>
       </div>
 
@@ -419,7 +395,7 @@ export default function MediaPicker({
                         <a href={hit.pageURL} target="_blank" rel="noreferrer" className="shrink-0 font-medium text-brand hover:underline">Kaynak</a>
                       </div>
                       <Button type="button" size="sm" className="w-full" disabled={off} onClick={() => void saveVideo(hit)}>
-                        {busyId === hit.id ? "Ekleniyor…" : "Arka plan yap + kütüphaneye ekle"}
+                        {busyId === hit.id ? "İndiriliyor…" : "Arka plan yap + kütüphaneye ekle"}
                       </Button>
                     </div>
                   </article>
@@ -442,7 +418,7 @@ export default function MediaPicker({
         <div className="space-y-3 rounded-xl border border-line bg-surface p-4">
           <p className="text-sm font-medium text-ink">Pixabay 3D kataloğu</p>
           <p className="text-xs leading-relaxed text-muted">
-            Pixabay geliştirici API&apos;si yalnızca fotoğraf ve video arıyor; 3D modeller için API olmadığından katalog yeni sekmede açılır. Modeli indirip aşağıdan seçin: tek tıkla hem önizleme karesi arka plan olur hem de model kütüphaneye eklenir.
+            Pixabay geliştirici API&apos;si fotoğraf ve video arıyor; 3D modeller için resmi API endpoint&apos;i bulunmadığından katalog yeni sekmede açılır. Modeli Pixabay&apos;den indirin ve buradan yükleyin.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="secondary" disabled={off} onClick={open3DSearch}>Pixabay&apos;de 3D model ara ↗</Button>
@@ -470,8 +446,9 @@ export default function MediaPicker({
             />
             <span className="block text-[11px] text-faint">Tek dosyalı .glb · en fazla 50 MB. Doku dosyaları ayrı olan .gltf paketleri şimdilik desteklenmiyor.</span>
           </label>
+          <p className="text-[11px] text-faint">GLB dosyası model olarak korunur; WebGL destekleniyorsa 3B önizlemesi tek kareye çevrilip kompozisyon arka planında kullanılır.</p>
           <Button type="button" disabled={!modelFile || off} onClick={() => void addModel()}>
-            {busyId === "model" ? "Hazırlanıyor…" : "Arka plan yap + kütüphaneye ekle"}
+            {busyId === "model" ? "Doğrulanıyor ve kaydediliyor…" : "Arka plan yap + kütüphaneye ekle"}
           </Button>
         </div>
       )}

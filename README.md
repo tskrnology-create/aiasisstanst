@@ -10,9 +10,9 @@ KOBİ'lerin ve markaların sosyal medya içeriklerini tek bir çalışma alanın
 |---|---|---|
 | İşletme / marka profili | `/` | Bir hesapta birden fazla marka, kullanıcıya özel aktif marka seçimi, marka adı, sektör, ürünler, hedef kitle, marka dili, **ana + yardımcı renk**, logo ve sosyal hesaplar. Sosyal hesap kayıtları platform bağlantısı değildir. |
 | İçerik üretimi | `/uret` | Marka profiline göre gönderi, açıklama, hashtag, reklam ve hikâye metni; alternatif tonlar; kütüphaneye taslak olarak kaydetme. Gemini → DeepSeek → OpenAI yedek sırası. |
-| Görsel oluşturma | `/gorsel` | Üç adımlı içerik/tasarım/arka plan akışı; marka renkleri/logo ve oran slider'ı, şablon galerisi, metin düzenleme ve canlı önizleme; Pixabay fotoğraf/video araması; 3D için Pixabay katalog bağlantısı + GLB yükleme; PNG indirme veya özel depoda kütüphaneye kaydetme. |
+| Görsel oluşturma | `/gorsel` | Üç adımlı içerik/tasarım/arka plan akışı; marka renkleri/logo ve oran slider'ı, şablon galerisi, metin düzenleme ve canlı önizleme; Pixabay fotoğraf/video araması; seçilen fotoğraf, video posteri veya GLB model karesi arka plan olurken medya özel depoya ve kütüphaneye kaydedilir; PNG indirme veya özel depoda çıktı kaydı. |
 | İçerik takvimi | `/takvim` | Ay/hafta görünümü, kayıtlı sosyal hesap seçimi, hatırlatma zamanı, saat değiştirme ve manuel “paylaşıldı” günlüğü (`posted_at`, isteğe bağlı `post_url`). Hatırlatma yalnızca uygulama içindedir; e-posta/push bildirimi yoktur. |
-| İçerik kütüphanesi | `/kutuphane` | Arama, durum filtresi, düzenleme, onay/taslak, metin indirme; özel saklanan görsel ve 3D modelleri görüntüleme, videoları oynatma, silme ve içeriği yeniden kullanma. |
+| İçerik kütüphanesi | `/kutuphane` | Arama, durum filtresi, düzenleme, onay/taslak, metin indirme; özel saklanan görsel, MP4/WebM video ve 3D modelleri görüntüleme/oynatma, silme ve içeriği yeniden kullanma. |
 | Hesap ve veri erişimi | Supabase Auth + RLS | E-posta/şifre oturumu, aktif `business_id` filtreleri ve işletme sahibine göre satır düzeyinde erişim politikaları; üretim API'leri marka sahipliğini ayrıca doğrular. |
 
 ## Teknoloji
@@ -33,7 +33,7 @@ KOBİ'lerin ve markaların sosyal medya içeriklerini tek bir çalışma alanın
    ```
 
 3. `.env.example` dosyasını `.env.local` olarak kopyalayın; Supabase URL/publishable key ve kullanacağınız model sağlayıcı anahtarlarını ekleyin. Pixabay araması için `PIXABAY_API_KEY` gerekir. `NEXT_PUBLIC_` değişkenleri tarayıcıya açık olacağından bunlara gizli anahtar koymayın.
-4. Supabase projesinde sırasıyla `schema.sql`, `schema_v2_image_usage.sql`, `schema_v3_visual_storage.sql`, `schema_v4_media_library.sql` ve `schema_v5_workspace_and_manual_publishing.sql` dosyalarını SQL Editor üzerinden çalıştırın.
+4. Supabase projesinde sırasıyla `schema.sql`, `schema_v2_image_usage.sql`, `schema_v3_visual_storage.sql`, `schema_v4_media_library.sql`, `schema_v5_workspace_and_manual_publishing.sql` ve `schema_v6_atomic_profile_and_media_integrity.sql` dosyalarını SQL Editor üzerinden çalıştırın.
 5. Geliştirme sunucusunu başlatın:
 
    ```bash
@@ -62,6 +62,7 @@ Supabase başlangıç SQL'leri:
 3. `schema_v3_visual_storage.sql` (özel görsel deposu ve `businesses` RLS görünürlüğünü aşmadan sahiplik denetleyen Storage politikaları)
 4. `schema_v4_media_library.sql` (medya türü alanı, genişletilmiş MIME/50 MB limitli özel bucket)
 5. `schema_v5_workspace_and_manual_publishing.sql` (manuel yayın günlüğü/hedef hesap, atomik sosyal hesap eşitleme ve üretim kotası, telafi edilebilir Storage temizliği)
+6. `schema_v6_atomic_profile_and_media_integrity.sql` (profil+sosyal hesapların tek transaction'da kaydı ve içerik business_id değişmezliği)
 
 Şema değişikliklerini canlı veritabanına uygulamadan önce yedek alın ve staging ortamında deneyin. İki farklı kullanıcıyla RLS izolasyonunu doğrulamadan canlıya çıkmayın.
 
@@ -71,8 +72,8 @@ Supabase başlangıç SQL'leri:
 - Veritabanı tablolarında RLS etkinleştirilmiştir. Gerçek güvenlik, Supabase SQL şemasının hedef projede doğru uygulanmasına bağlıdır.
 - Metin ve görsel üretim uçları oturum belirtecini ve seçilen markanın sahipliğini doğrular; `schema_v5_workspace_and_manual_publishing.sql` kotayı DB kilidiyle atomik olarak ayırır (marka başına saatte metin 30, görsel 10). Başarısız üretim rezervasyonu bırakır.
 - Canlıya çıkmadan önce staging veritabanında iki kullanıcıyla RLS izolasyonunu, eşzamanlı kota çağrılarını, sağlayıcı limitlerini ve maliyet alarmlarını ayrıca doğrulayın.
-- Pixabay aramasında API anahtarı yalnızca sunucu tarafındaki `PIXABAY_API_KEY` olarak saklanır. Arama sonuçları 24 saat cache edilir; Pixabay fotoğraf URL'leri kalıcı hotlink edilmez, seçilen dosya sunucuda 12 MB akış sınırıyla özel depoya indirilir. 3D modeller için resmi Pixabay API endpoint'i olmadığı için uygulama Pixabay 3D kataloğuna yönlendirir; yüklenen `.glb` dosyası sunucuda doğrulanır (50 MB sınırı, GLB v2 yapısı, harici doku/URL reddi). Uygulama kaynak bilgilerini kayda ekler; üçüncü taraf marka/kişilik/telif haklarını ayrıca kontrol edin. Detaylar [`docs/pixabay-integration-notes.md`](docs/pixabay-integration-notes.md) dosyasındadır.
-- Kütüphaneye görsel/GLB kaydetmek için `schema_v3_visual_storage.sql` ve ardından `schema_v4_media_library.sql` uygulanmalıdır. Bucket özeldir; yalnızca medya yolundaki işletmenin sahibi dosyayı okuyabilir, yükleyebilir ve silebilir. Görsel stüdyosu PNG'si `/api/media/library` üzerinden Bearer oturumu ve marka sahipliği doğrulanarak, 12 MB sınırıyla kaydedilir. `DEPO_IZIN_400` görülürse depoda bu güncel `schema_v3_visual_storage.sql` sürümünü (SECURITY DEFINER sahiplik kontrolünü içerir) ve ardından `schema_v4_media_library.sql` dosyasını Supabase SQL Editor'de tekrar çalıştırın. v5 içeriği ve alt kayıtlarını DB'den temizler, Storage hatasını yeniden denenebilir kuyruğa alır.
+- Pixabay aramasında API anahtarı yalnızca sunucu tarafındaki `PIXABAY_API_KEY` olarak saklanır. Arama sonuçları 24 saat cache edilir; fotoğraflar (12 MB) ve seçilen videolar (50 MB, MP4/WebM) sunucuda özel depoya kopyalanır, harici URL'ye kalıcı hotlink yapılmaz. Video için Pixabay poster karesi kompozisyon arka planına uygulanır; 3D model için resmi API olmadığından kullanıcı Pixabay kataloğuna yönlendirilir ve doğrulanmış tek dosyalı GLB (50 MB, GLB v2, harici doku/URL reddi) kütüphaneye alınır; WebGL destekleniyorsa model karesi arka plan olur. Kaynak/yaratıcı bilgisi kayda eklenir; üçüncü taraf marka/kişilik/telif haklarını ayrıca kontrol edin. Detaylar [`docs/pixabay-integration-notes.md`](docs/pixabay-integration-notes.md) dosyasındadır.
+- Kütüphaneye medya kaydetmek için `schema_v3_visual_storage.sql` ve ardından `schema_v4_media_library.sql` uygulanmalıdır. Bu iki dosyanın güncel sürümü MP4/WebM MIME türlerini de izin listesine ekler; eski kurulumda yalnızca v4'ü tekrar çalıştırarak bucket allowlist'ini yenileyin (v3'ü de yeniden çalıştırmak güvenlidir). Bucket özeldir; yalnızca medya yolundaki işletmenin sahibi dosyayı okuyabilir, yükleyebilir ve silebilir. `DEPO_IZIN_400` veya video MIME hatası görülürse güncel v3 ardından v4'ü Supabase SQL Editor'de tekrar çalıştırın. Profil ve sosyal hesapların atomik kaydı ile içerik `business_id` güvenliği için v5'ten sonra v6 migration'ı da gereklidir. Bu depodan canlı Supabase'e otomatik migration uygulanmaz.
 - Şifre sıfırlama, e-posta daveti, ekip/rol yönetimi, denetim kaydı ve hesap silme akışları bu MVP'de tamamlanmış ürün özellikleri olarak sunulmaz.
 
 ## Marka paleti kuralı
@@ -101,8 +102,9 @@ Bu sürümde bilinçli olarak kapsam dışında kalan veya canlıya çıkmadan �
 - `schema.sql`: temel tablolar, ilişkiler, tetikleyiciler ve RLS politikaları
 - `schema_v2_image_usage.sql`: görsel üretim kullanım kaydı
 - `schema_v3_visual_storage.sql`: özel medya deposu ve RLS politikaları
-- `schema_v4_media_library.sql`: medya türleri ve özel fotoğraf/model depolaması
+- `schema_v4_media_library.sql`: medya türleri ve fotoğraf/video/model depolaması
 - `schema_v5_workspace_and_manual_publishing.sql`: aktif marka akışına uygun RPC'ler, manuel yayın günlüğü, atomik kota ve telafi edilebilir medya temizliği
+- `schema_v6_atomic_profile_and_media_integrity.sql`: atomik profil+hesap kaydı ve içerik marka kimliği bütünlüğü
 - `src/lib/*.test.ts`, `vitest.config.mts`: marka paleti, PNG doğrulama, GLB ve güvenli paylaşım URL birim testleri
 - `.env.example`: beklenen ortam değişkenleri için örnek
 - `docs/platform-entegrasyon-plani.md`: platform API koşulları ve otomatik yayına geçiş planı

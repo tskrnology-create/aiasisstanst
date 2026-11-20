@@ -17,9 +17,8 @@ export async function snapshotModel(
   await import("@google/model-viewer");
   const objectUrl = URL.createObjectURL(file);
   const holder = document.createElement("div");
-  holder.style.cssText = "position:fixed;left:-10000px;top:0;width:900px;height:900px;pointer-events:none;";
+  holder.style.cssText = "position:fixed;left:0;top:0;width:900px;height:900px;opacity:0;pointer-events:none;z-index:-1;";
   const viewer = document.createElement("model-viewer") as ModelViewerElement;
-  viewer.setAttribute("src", objectUrl);
   viewer.setAttribute("alt", "3D model önizlemesi");
   viewer.setAttribute("camera-orbit", "32deg 72deg auto");
   viewer.setAttribute("environment-image", "neutral");
@@ -35,11 +34,19 @@ export async function snapshotModel(
       const timer = setTimeout(() => reject(new Error("3D model zamanında yüklenemedi.")), 25_000);
       viewer.addEventListener("load", () => { clearTimeout(timer); resolve(); }, { once: true });
       viewer.addEventListener("error", () => { clearTimeout(timer); reject(new Error("3D model okunamadı.")); }, { once: true });
+      viewer.setAttribute("src", objectUrl);
     });
     // Kamera/ışık oturana kadar bir iki kare bekle.
     await new Promise((resolve) => setTimeout(resolve, 600));
     const blob = await viewer.toBlob({ mimeType: "image/png", idealAspect: true });
-    const modelImage = await loadImage(URL.createObjectURL(blob));
+    if (!blob.size || !blob.type.startsWith("image/")) throw new Error("3D model önizlemesi boş döndü.");
+    const snapshotUrl = URL.createObjectURL(blob);
+    let modelImage: HTMLImageElement;
+    try {
+      modelImage = await loadImage(snapshotUrl);
+    } finally {
+      URL.revokeObjectURL(snapshotUrl);
+    }
 
     const canvas = document.createElement("canvas");
     canvas.width = opts.width;

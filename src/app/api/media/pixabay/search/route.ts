@@ -1,4 +1,5 @@
 import { authenticateRequest } from "@/lib/api-user";
+import { isPixabayPageUrl, isPixabayPosterUrl, isPixabayVideoUrl } from "@/lib/pixabay-video-utils";
 
 const PIXABAY_API = "https://pixabay.com/api/";
 const MAX_QUERY_LENGTH = 100;
@@ -30,7 +31,7 @@ type PixabayVideoHit = {
 };
 type SearchResult =
   | { kind: "photo"; id: number; pageURL: string; tags: string; previewURL: string; width: number; height: number; user: string }
-  | { kind: "video"; id: number; pageURL: string; tags: string; user: string; duration: number; thumbnailURL: string; videoURL: string; width: number; height: number };
+  | { kind: "video"; id: number; pageURL: string; tags: string; user: string; duration: number; thumbnailURL: string; width: number; height: number };
 
 function json(body: Record<string, unknown>, status = 200) {
   return Response.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
@@ -93,7 +94,7 @@ export async function POST(request: Request) {
     };
     const results: SearchResult[] = [];
     for (const hit of payload.hits ?? []) {
-      if (!Number.isSafeInteger(hit.id) || !hit.pageURL?.startsWith("https://pixabay.com/")) continue;
+      if (!Number.isSafeInteger(hit.id) || !isPixabayPageUrl(hit.pageURL ?? "")) continue;
       if (kind === "photo") {
         const image = hit as PixabayImageHit;
         if (!image.previewURL?.startsWith("https://")) continue;
@@ -111,17 +112,16 @@ export async function POST(request: Request) {
       }
       const video = hit as PixabayVideoHit;
       const rendition = video.videos?.medium ?? video.videos?.small;
-      if (!rendition?.url?.startsWith("https://") || !rendition.thumbnail?.startsWith("https://")) continue;
+      if (!rendition || !isPixabayVideoUrl(rendition.url) || !isPixabayPosterUrl(rendition.thumbnail)) continue;
       results.push({
         kind: "video",
         id: video.id,
         pageURL: video.pageURL,
         tags: video.tags ?? "",
-        user: video.user ?? "Pixabay katkıcısı",
-        duration: video.duration ?? 0,
-        thumbnailURL: rendition.thumbnail,
-        videoURL: rendition.url,
-        width: rendition.width ?? 0,
+          user: video.user ?? "Pixabay katkıcısı",
+          duration: video.duration ?? 0,
+          thumbnailURL: rendition.thumbnail,
+          width: rendition.width ?? 0,
         height: rendition.height ?? 0,
       });
     }

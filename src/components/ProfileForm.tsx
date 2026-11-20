@@ -66,9 +66,13 @@ const SLOTS = [
 function BrandColorSlots({
   colors,
   onChange,
+  "aria-describedby": describedBy,
+  "aria-invalid": invalid,
 }: {
   colors: string[];
   onChange: (next: string[]) => void;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
 }) {
   const current = [colors[0] ?? "", colors[1] ?? ""];
   const bothValid = isValidHex(current[0]) && isValidHex(current[1]);
@@ -83,7 +87,7 @@ function BrandColorSlots({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" role="group" aria-label="Marka renkleri" aria-describedby={describedBy}>
       <div className="grid gap-3 sm:grid-cols-2">
         {SLOTS.map((slot) => {
           const value = current[slot.index];
@@ -104,12 +108,16 @@ function BrandColorSlots({
                 <input
                   type="color"
                   aria-label={`${slot.title} seçici`}
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid}
                   value={swatch}
                   onChange={(e) => set(slot.index, e.target.value)}
                   className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-line bg-transparent"
                 />
                 <input
                   aria-label={`${slot.title} kodu`}
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid}
                   className={cx(inputClass, "font-mono text-xs uppercase")}
                   value={value}
                   onChange={(e) => set(slot.index, e.target.value.trim())}
@@ -395,14 +403,14 @@ function ProfileFormWorkspace({
         </Field>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <Field label="Marka renkleri" error={errors.brand_colors}>
+          <Field label="Marka renkleri" error={errors.brand_colors} errorId="biz-colors-error">
             <BrandColorSlots
               colors={colors.length ? colors : ["", ""]}
               onChange={(next) => update("brand_colors", next)}
             />
           </Field>
 
-          <Field label="Logo" error={logoError ?? undefined} hint="PNG, JPG veya WebP, en fazla 500 KB.">
+          <Field label="Logo" htmlFor="biz-logo" error={logoError ?? undefined} errorId="biz-logo-error" hint="PNG, JPG veya WebP, en fazla 500 KB.">
             <div className="flex items-center gap-4 rounded-xl border border-dashed border-line-strong bg-surface-2/50 p-4">
               {form.logo_data_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -420,8 +428,11 @@ function ProfileFormWorkspace({
                 <label className={cx(labelClass, "inline-flex cursor-pointer text-sm text-brand dark:text-brand-strong")}>
                   {form.logo_data_url ? "Logoyu değiştir" : "Logo yükle"}
                   <input
+                    id="biz-logo"
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
+                    aria-invalid={logoError ? true : undefined}
+                    aria-describedby={logoError ? "biz-logo-error" : undefined}
                     onChange={onLogoChange}
                     className="sr-only"
                   />
@@ -477,6 +488,8 @@ function ProfileFormWorkspace({
               </select>
               <input
                 aria-label={`Hesap adı ${i + 1}`}
+                aria-invalid={errors.social_accounts && !acc.handle.trim() ? true : undefined}
+                aria-describedby={errors.social_accounts ? "social-accounts-error" : undefined}
                 className={cx(inputClass, "min-w-[10rem] flex-1 py-2")}
                 value={acc.handle}
                 onChange={(e) => {
@@ -501,7 +514,7 @@ function ProfileFormWorkspace({
             <p className={hintClass}>Henüz hesap eklenmedi. Hesapları kaydetmek zorunlu değildir.</p>
           )}
           {errors.social_accounts && (
-            <p className="text-xs font-medium text-danger">{errors.social_accounts}</p>
+            <p id="social-accounts-error" role="alert" aria-live="polite" className="text-xs font-medium text-danger">{errors.social_accounts}</p>
           )}
           <Button
             type="button"
@@ -539,7 +552,7 @@ function ProfileFormWorkspace({
             Kaydedildi · {savedAt.toLocaleTimeString("tr-TR")}
           </span>
         )}
-        {saveError && <span className="text-sm font-medium text-danger">{saveError}</span>}
+        {saveError && <span role="alert" aria-live="polite" className="text-sm font-medium text-danger">{saveError}</span>}
         <span className={cx(hintClass, "ml-auto hidden sm:block")}>
           Kaydettiğiniz profil tüm üretimlerde otomatik kullanılır.
         </span>

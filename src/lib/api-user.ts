@@ -73,7 +73,8 @@ export async function uploadVisual(
   request: Request,
   path: string,
   bytes: Uint8Array,
-  contentType: string
+  contentType: string,
+  timeoutMs = 30_000
 ): Promise<StorageResult> {
   const url = storageEndpoint(path);
   const headers = storageHeaders(request);
@@ -83,7 +84,7 @@ export async function uploadVisual(
       method: "POST",
       headers: { ...headers, "Content-Type": contentType, "x-upsert": "false", "Cache-Control": "max-age=3600" },
       body: new Blob([bytes as BlobPart], { type: contentType }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (res.ok) return { ok: true };
     const text = await res.text().catch(() => "");

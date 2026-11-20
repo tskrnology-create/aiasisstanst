@@ -3,6 +3,7 @@
 // Ortak arayüz bileşenleri: tüm ekranlar aynı görsel dili kullansın diye tek yerde.
 
 import Link from "next/link";
+import { cloneElement, isValidElement, useId, useRef, type ReactElement, type ReactNode } from "react";
 import { STATUS_LABEL, type ContentStatus } from "@/lib/library-utils";
 import { IconAlert, IconCheck, IconInfo } from "./Icons";
 
@@ -95,23 +96,44 @@ export function Field({
   hint,
   error,
   htmlFor,
+  errorId: suppliedErrorId,
   children,
 }: {
   label: string;
   hint?: string;
   error?: string;
   htmlFor?: string;
-  children: React.ReactNode;
+  errorId?: string;
+  children: ReactNode;
 }) {
+  const fieldId = useId();
+  const labelId = `${fieldId}-label`;
+  const messageId = error
+    ? suppliedErrorId ?? `${fieldId}-error`
+    : hint
+      ? `${fieldId}-hint`
+      : undefined;
+  const describedChildren = isValidElement(children)
+    ? cloneElement(children as ReactElement<Record<string, unknown>>, {
+        "aria-describedby": messageId,
+        "aria-invalid": error ? true : undefined,
+      })
+    : children;
+
   return (
-    <div className="space-y-1.5">
-      <label htmlFor={htmlFor} className={labelClass}>
+    <div
+      className="space-y-1.5"
+      role={htmlFor ? undefined : "group"}
+      aria-labelledby={htmlFor ? undefined : labelId}
+      aria-describedby={messageId}
+    >
+      <label id={labelId} htmlFor={htmlFor} className={labelClass}>
         {label}
       </label>
-      {children}
-      {hint && !error && <p className={hintClass}>{hint}</p>}
+      {describedChildren}
+      {hint && !error && <p id={messageId} className={hintClass}>{hint}</p>}
       {error && (
-        <p className="flex items-center gap-1.5 text-xs font-medium text-danger">
+        <p id={messageId} role="alert" aria-live="polite" className="flex items-center gap-1.5 text-xs font-medium text-danger">
           <IconAlert className="h-3.5 w-3.5" />
           {error}
         </p>
@@ -170,8 +192,11 @@ export function Segmented<T extends string>({
   ariaLabel: string;
   className?: string;
 }) {
+  const groupRef = useRef<HTMLDivElement>(null);
+
   return (
     <div
+      ref={groupRef}
       role="radiogroup"
       aria-label={ariaLabel}
       className={cx(
@@ -179,7 +204,7 @@ export function Segmented<T extends string>({
         className
       )}
     >
-      {options.map((option) => {
+      {options.map((option, index) => {
         const active = option.value === value;
         return (
           <button
@@ -187,9 +212,21 @@ export function Segmented<T extends string>({
             type="button"
             role="radio"
             aria-checked={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => onChange(option.value)}
+            onKeyDown={(event) => {
+              let nextIndex: number;
+              if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (index + 1) % options.length;
+              else if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (index - 1 + options.length) % options.length;
+              else if (event.key === "Home") nextIndex = 0;
+              else if (event.key === "End") nextIndex = options.length - 1;
+              else return;
+              event.preventDefault();
+              onChange(options[nextIndex].value);
+              groupRef.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[nextIndex]?.focus();
+            }}
             className={cx(
-              "rounded-lg px-3 py-1.5 text-sm font-medium transition",
+              "rounded-lg px-3 py-1.5 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
               active
                 ? "bg-surface text-ink shadow-[0_1px_2px_rgba(16,16,24,0.08)]"
                 : "text-muted hover:text-ink"

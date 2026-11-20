@@ -1,9 +1,9 @@
--- İçerik kütüphanesinde saklanan görseller için özel Supabase Storage bucket.
+-- İçerik kütüphanesinde saklanan görseller ve videolar için özel Supabase Storage bucket.
 -- Supabase SQL Editor'de schema.sql ve schema_v2_image_usage.sql sonrasında çalıştırın.
 -- Yeniden çalıştırılabilir: visuals bucket'ını ve sahiplik RLS politikalarını günceller.
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('visuals', 'visuals', false, 52428800, array['image/png', 'image/jpeg', 'image/webp', 'model/gltf-binary', 'model/gltf+json']::text[])
+values ('visuals', 'visuals', false, 52428800, array['image/png', 'image/jpeg', 'image/webp', 'video/mp4', 'video/webm', 'model/gltf-binary', 'model/gltf+json']::text[])
 on conflict (id) do update
   set public = false,
       file_size_limit = excluded.file_size_limit,

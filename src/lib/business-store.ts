@@ -86,42 +86,24 @@ export const businessStore: BusinessStore = {
       logo_url: business.logo_data_url,
     };
 
-    let businessId = business.id;
-    if (businessId) {
-      const { data, error } = await supabase
-        .from("businesses")
-        .update(fields)
-        .eq("id", businessId)
-        .select("id")
-        .single();
-      if (error || !data) throw new Error(error?.message ?? "İşletme güncellenemedi.");
-    } else {
-      const { data, error } = await supabase
-        .from("businesses")
-        .insert({ ...fields, owner_id: userData.user.id })
-        .select("id")
-        .single();
-      if (error || !data) throw new Error(error?.message ?? "İşletme oluşturulamadı.");
-      businessId = data.id as string;
-    }
-
     const unique = new Map<string, SocialAccount>();
     for (const account of business.social_accounts) {
       const handle = account.handle.trim();
       if (!handle) continue;
       unique.set(`${account.platform}:${handle.toLocaleLowerCase()}`, { ...account, handle });
     }
-    const { error: accountsError } = await supabase.rpc("sync_social_accounts", {
-      p_business_id: businessId,
+    const { data: businessId, error: saveError } = await supabase.rpc("save_business_with_accounts", {
+      p_business_id: business.id ?? null,
+      p_profile: fields,
       p_accounts: [...unique.values()].map(({ id, platform, handle }) => ({
         id: id ?? null,
         platform,
         handle,
       })),
     });
-    if (accountsError) {
+    if (saveError || typeof businessId !== "string") {
       throw new Error(
-        `Marka kaydedildi ancak sosyal hesaplar eşitlenemedi: ${accountsError.message}. schema_v5_workspace_and_manual_publishing.sql migration'ını kontrol edin.`
+        `Marka profili ve sosyal hesaplar birlikte kaydedilemedi: ${saveError?.message ?? "RPC geçerli marka kimliği döndürmedi"}. schema_v6_atomic_profile_and_media_integrity.sql migration'ını uygulayın.`
       );
     }
 
