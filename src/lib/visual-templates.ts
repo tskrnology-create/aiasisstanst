@@ -17,46 +17,70 @@ import {
 } from "./brand-palette";
 
 export type TemplateId =
-  | "duz"
-  | "gradyan"
-  | "cerceve"
-  | "serit"
-  | "fotograf"
-  | "diyagonal"
-  | "katmanli"
-  | "kose"
-  | "editorial"
-  | "cift-cerceve"
-  | "kolaj";
+  | "foto-alt"
+  | "kart"
+  | "bolunmus"
+  | "tipografi"
+  | "rozet"
+  | "cam"
+  | "kemer"
+  | "polaroid"
+  | "minimal"
+  | "bant"
+  | "alinti"
+  | "cerceve-foto";
 export type FormatId = "post" | "story" | "campaign" | "landscape" | "wide" | "pin";
 
 export const TEMPLATES: Array<{ id: TemplateId; label: string }> = [
-  { id: "duz", label: "Düz renk" },
-  { id: "gradyan", label: "Gradyan" },
-  { id: "cerceve", label: "Çerçeve" },
-  { id: "serit", label: "Şerit" },
-  { id: "fotograf", label: "Fotoğraflı" },
-  { id: "diyagonal", label: "Diyagonal" },
-  { id: "katmanli", label: "Katmanlı" },
-  { id: "kose", label: "Geometrik köşe" },
-  { id: "editorial", label: "Editoryal kart" },
-  { id: "cift-cerceve", label: "Çift çerçeve" },
-  { id: "kolaj", label: "Kolaj bantları" },
+  { id: "tipografi", label: "Büyük yazı" },
+  { id: "foto-alt", label: "Foto + başlık" },
+  { id: "kart", label: "Beyaz kart" },
+  { id: "bolunmus", label: "Bölünmüş" },
+  { id: "rozet", label: "Rozet" },
+  { id: "cam", label: "Cam panel" },
+  { id: "kemer", label: "Kemer" },
+  { id: "polaroid", label: "Polaroid" },
+  { id: "bant", label: "Duyuru bandı" },
+  { id: "cerceve-foto", label: "Çerçeveli foto" },
+  { id: "minimal", label: "Minimal" },
+  { id: "alinti", label: "Alıntı" },
 ];
 
-/** Her şablonda yardımcı rengin hangi alana denk düştüğü (arayüzde gösterilir). */
+export const DEFAULT_TEMPLATE: TemplateId = "tipografi";
+/** Arka plan seçilince, mevcut şablon fotoğraf kullanmıyorsa geçilecek şablon. */
+export const DEFAULT_PHOTO_TEMPLATE: TemplateId = "foto-alt";
+
+const NO_PHOTO: ReadonlySet<TemplateId> = new Set<TemplateId>(["minimal", "alinti"]);
+const PHOTO_BEST: ReadonlySet<TemplateId> = new Set<TemplateId>([
+  "foto-alt",
+  "kart",
+  "bolunmus",
+  "rozet",
+  "cam",
+  "kemer",
+  "polaroid",
+  "bant",
+  "cerceve-foto",
+]);
+/** Şablon arka plan fotoğrafı kullanabiliyor mu? */
+export const templateUsesPhoto = (id: TemplateId) => !NO_PHOTO.has(id);
+/** Şablon fotoğrafla en iyi görünüyor mu? (yoksa arayüz ipucu verir) */
+export const templateWantsPhoto = (id: TemplateId) => PHOTO_BEST.has(id);
+
+/** Her şablonun kısa açıklaması (arayüzde gösterilir). */
 export const TEMPLATE_USAGE: Record<TemplateId, string> = {
-  duz: "Alt bant ve vurgu çizgisi yardımcı renkte; üstteki yazı alanı ana renkte kalır.",
-  gradyan: "Gradyanın başlangıcı ana renk, bitiş bölgesi yardımcı renk; geçiş oranı sizdeki payı izler.",
-  cerceve: "Çerçeve çizgisi ve üst başlık bandı yardımcı renk; zemin ana rengin çok açık tonu.",
-  serit: "Üst bant ana renk, sol dikey şerit ve başlık altı çizgi yardımcı renk.",
-  fotograf: "Fotoğrafın üst bölgesine ana renk tonu, başlık altına yardımcı renk çizgi bindirilir.",
-  diyagonal: "Eğik renk bölünmesi ana ve yardımcı rengi tek kompozisyonda birleştirir.",
-  katmanli: "Üst bant, alt şerit ve vurgu çizgisi iki marka rengiyle katmanlanır.",
-  kose: "Yardımcı renk köşelerde geometrik bloklar oluşturur; merkez ana renkte kalır.",
-  editorial: "Yardımcı renkli zemin üzerinde ana renkli editoryal kart ve vurgu etiketi kullanılır.",
-  "cift-cerceve": "İç ve dış çerçeveler yardımcı renkle sırayla kullanılır; yazı alanı açık kalır.",
-  kolaj: "Üst-alt bantlar ve yan şerit farklı ölçülerde bir araya gelir.",
+  tipografi: "Marka renginde zemin, dev başlık ve renkli daire. Fotoğraf eklerseniz daire içinde görünür.",
+  "foto-alt": "Tam ekran fotoğraf, altta okunaklı büyük başlık. Hikâye ve gönderi için klasik.",
+  kart: "Fotoğrafın üstünde yuvarlak köşeli beyaz bilgi kartı. Duyuru ve ürün için.",
+  bolunmus: "Yarısı fotoğraf, yarısı marka rengi panel. Metni net gösterir.",
+  rozet: "Büyük dairesel rozet (alt yazı rozette) ve altta başlık. İndirim ve kampanya için.",
+  cam: "Fotoğraf üzerinde yarı saydam cam görünümlü panel; ortalı yazı.",
+  kemer: "Kemer biçimli fotoğraf penceresi ve altında başlık. Şık, sakin marka duruşu.",
+  polaroid: "Hafif eğik polaroid kartı ve bant. Samimi, hikâye anlatan paylaşımlar için.",
+  bant: "Fotoğrafın ortasından geçen eğik duyuru bandı. Dikkat çekici kısa mesajlar için.",
+  "cerceve-foto": "Marka renginde zemin, içte yuvarlak köşeli fotoğraf ve altında başlık.",
+  minimal: "Açık zemin, ince çizgiler ve sade tipografi. Fotoğraf kullanmaz.",
+  alinti: "Dev tırnak işareti ve ortalı yazı. Müşteri yorumu ve söz paylaşımları için.",
 };
 
 export const FORMATS: Record<
@@ -201,33 +225,6 @@ function paletteOf(spec: VisualSpec): BrandPalette {
   return readPalette(spec.colors, spec.ratioId ?? DEFAULT_RATIO);
 }
 
-/** Fotoğraflı kompozisyonlar için marka tonu ve metin okunurluk perdesi. */
-function drawCompositeBase(
-  ctx: CanvasRenderingContext2D,
-  spec: VisualSpec,
-  palette: BrandPalette,
-  width: number,
-  height: number
-): boolean {
-  if (!spec.background || !spec.backgroundSize) {
-    ctx.fillStyle = palette.primary;
-    ctx.fillRect(0, 0, width, height);
-    return false;
-  }
-  const rect = coverRect(spec.backgroundSize.w, spec.backgroundSize.h, width, height);
-  ctx.drawImage(spec.background, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, width, height);
-  ctx.fillStyle = palette.primary;
-  ctx.globalAlpha = 0.3;
-  ctx.fillRect(0, 0, width, height);
-  ctx.globalAlpha = 1;
-  const scrim = ctx.createLinearGradient(0, 0, 0, height);
-  scrim.addColorStop(0, "rgba(0,0,0,0.16)");
-  scrim.addColorStop(1, "rgba(0,0,0,0.44)");
-  ctx.fillStyle = scrim;
-  ctx.fillRect(0, 0, width, height);
-  return true;
-}
-
 // Oran, palette verilmişse ona yoksa spec.share'a göre ayarlanır.
 function sharesOf(spec: VisualSpec, p: BrandPalette) {
   const share = spec.share ?? p.share;
@@ -240,7 +237,8 @@ function drawTextBlock(
   box: Box,
   headColor: string,
   subColor: string,
-  valign: "middle" | "bottom"
+  valign: "middle" | "bottom",
+  defaultAlign: "left" | "center" | "right" = "left"
 ): number | null {
   const head = spec.headline.trim();
   const sub = spec.subline.trim();
@@ -265,7 +263,7 @@ function drawTextBlock(
   const total = (headFit?.height ?? 0) + (subFit ? gap + subFit.height : 0);
   let y = valign === "bottom" ? layout.y + layout.h - total : layout.y + (layout.h - total) / 2;
   const startY = y;
-  const alignment = spec.textAlign ?? "left";
+  const alignment = spec.textAlign ?? defaultAlign;
   const x = alignment === "center" ? layout.x + layout.w / 2 : alignment === "right" ? layout.x + layout.w : layout.x;
 
   ctx.textBaseline = "top";
@@ -321,255 +319,534 @@ function drawBrand(
   }
 }
 
-export function drawVisual(ctx: CanvasRenderingContext2D, spec: VisualSpec): void {
+
+// ------------------------------------------------------------ yeni şablon seti
+
+interface Layout {
+  W: number;
+  H: number;
+  m: number; // kenar boşluğu
+  tall: boolean; // hikâye/pin: üst-alt arayüz alanları boş kalır
+  wide: boolean; // yatay formatlar
+  top: number; // güvenli üst sınır
+  bottom: number; // güvenli alt boşluk
+  footerH: number; // marka satırı yüksekliği
+  footerY: number; // marka satırı orta noktası
+  contentBottom: number; // yazı bloğunun alt sınırı (marka satırının üstü)
+}
+
+function layoutOf(spec: VisualSpec): Layout {
   const W = spec.width;
   const H = spec.height;
-  const m = Math.round(W * 0.08);
-  const tall = H / W > 1.6; // hikâye: üst ve alt arayüz alanları boş kalmalı
+  const tall = H / W > 1.6;
+  const wide = W / H > 1.3;
+  const m = Math.round(Math.min(W, H) * 0.08);
   const top = tall ? 250 : m;
   const bottom = tall ? 270 : m;
-  const footerH = Math.round(W * 0.075);
-  const p = paletteOf(spec);
-  const { share, accent } = sharesOf(spec, p);
+  const footerH = Math.round(Math.min(W, H) * 0.075);
+  const footerY = H - bottom - footerH / 2;
+  const contentBottom = H - bottom - footerH - Math.round(Math.min(W, H) * 0.035);
+  return { W, H, m, tall, wide, top, bottom, footerH, footerY, contentBottom };
+}
 
-  let template = spec.template;
-  const hasBg = Boolean(spec.background && spec.backgroundSize);
-  if (template === "fotograf" && !hasBg) template = "gradyan"; // arka plan yoksa güvenli yedek
+function shape(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number | number[] = 0) {
+  ctx.beginPath();
+  if (typeof ctx.roundRect === "function") ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
 
-  ctx.clearRect(0, 0, W, H);
+function circle(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+}
 
-  if (template === "duz") {
-    // Ana renk yüzeyin (1 - accent) kadarında: alt bant yardımcı renge ayrılır.
-    const bandH = Math.round(H * accent);
-    const bandY = H - bandH;
-    ctx.fillStyle = p.primary;
-    ctx.fillRect(0, 0, W, H);
+/** Dikdörtgen alana fotoğraf (cover) çizer; fotoğraf yoksa marka renkli gradyan + dekor daireler. */
+function paintPhoto(
+  ctx: CanvasRenderingContext2D,
+  spec: VisualSpec,
+  p: BrandPalette,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radius: number | number[] = 0
+): boolean {
+  ctx.save();
+  shape(ctx, x, y, w, h, radius);
+  ctx.clip();
+  const has = Boolean(spec.background && spec.backgroundSize);
+  if (has) {
+    const size = spec.backgroundSize as { w: number; h: number };
+    const r = coverRect(size.w, size.h, w, h);
+    ctx.drawImage(spec.background as CanvasImageSource, r.sx, r.sy, r.sw, r.sh, x, y, w, h);
+  } else {
+    const g = ctx.createLinearGradient(x, y, x + w, y + h);
+    g.addColorStop(0, p.primary);
+    g.addColorStop(1, mix(p.primary, p.secondary, 0.7));
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+    const R = Math.min(w, h);
     ctx.fillStyle = p.secondary;
-    ctx.fillRect(0, bandY, W, bandH);
-    const textBottom = bandY - Math.round(W * 0.05);
+    ctx.globalAlpha = 0.28;
+    circle(ctx, x + w * 0.82, y + h * 0.22, R * 0.34);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.globalAlpha = 0.07;
+    circle(ctx, x + w * 0.15, y + h * 0.85, R * 0.5);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+  return has;
+}
+
+function verticalScrim(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  stops: Array<[number, string]>
+) {
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  for (const [at, color] of stops) g.addColorStop(at, color);
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, h);
+}
+
+function accentBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string) {
+  ctx.fillStyle = color;
+  shape(ctx, x, y, w, h, h / 2);
+  ctx.fill();
+}
+
+type Painter = (ctx: CanvasRenderingContext2D, spec: VisualSpec, p: BrandPalette, L: Layout, accent: number) => void;
+
+const DARK = (p: BrandPalette) => mix(p.primary, "#101010", 0.6);
+
+const painters: Record<TemplateId, Painter> = {
+  // Tam ekran fotoğraf, altta büyük başlık
+  "foto-alt": (ctx, spec, p, L) => {
+    const { W, H, m } = L;
+    paintPhoto(ctx, spec, p, 0, 0, W, H);
+    verticalScrim(ctx, 0, 0, W, H, [
+      [0, "rgba(0,0,0,0.30)"],
+      [0.28, "rgba(0,0,0,0.04)"],
+      [0.5, "rgba(0,0,0,0.30)"],
+      [1, "rgba(0,0,0,0.80)"],
+    ]);
+    drawBrand(ctx, spec, m, L.tall ? L.top : m + L.footerH / 2, L.footerH, "#ffffff");
+    const boxTop = Math.round(H * 0.4);
+    const startY = drawTextBlock(
+      ctx,
+      spec,
+      { x: m, y: boxTop, w: L.wide ? W * 0.7 : W - 2 * m, h: L.contentBottom + L.footerH * 0.9 - boxTop },
+      "#ffffff",
+      "#f4f4f5",
+      "bottom"
+    );
+    if (startY !== null) accentBar(ctx, m, startY - Math.round(L.m * 0.55), Math.round(W * 0.14), Math.max(9, Math.round(W * 0.011)), p.secondary);
+  },
+
+  // Fotoğraf üstünde beyaz bilgi kartı
+  kart: (ctx, spec, p, L) => {
+    const { W, H, m } = L;
+    paintPhoto(ctx, spec, p, 0, 0, W, H);
+    verticalScrim(ctx, 0, 0, W, H, [
+      [0, "rgba(0,0,0,0.05)"],
+      [1, "rgba(0,0,0,0.30)"],
+    ]);
+    const card = L.wide
+      ? { x: m, y: m, w: Math.round(W * 0.47), h: H - 2 * m }
+      : (() => {
+          const h = Math.round(H * (L.tall ? 0.3 : 0.38));
+          return { x: m, y: H - L.bottom - h, w: W - 2 * m, h };
+        })();
+    const pad = Math.round(Math.min(card.w, card.h) * 0.09);
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.32)";
+    ctx.shadowBlur = 48;
+    ctx.shadowOffsetY = 16;
+    ctx.fillStyle = "#ffffff";
+    shape(ctx, card.x, card.y, card.w, card.h, Math.round(m * 0.55));
+    ctx.fill();
+    ctx.restore();
+    accentBar(ctx, card.x + pad, card.y + pad, Math.round(card.w * 0.14), 10, p.secondary);
+    const brandH = Math.round(L.footerH * 0.7);
     drawTextBlock(
       ctx,
       spec,
-      { x: m, y: top, w: W - 2 * m, h: Math.max(120, textBottom - top) },
-      p.onPrimary,
-      p.onPrimary,
+      { x: card.x + pad, y: card.y + pad + 34, w: card.w - 2 * pad, h: card.h - 2 * pad - 34 - brandH - 14 },
+      DARK(p),
+      "#52525b",
       "middle"
     );
-    // Bant büyüdükçe yazı da büyür; genişliği aşmaması için üst sınır uygulanır.
-    drawBrand(ctx, spec, m, bandY + bandH / 2, Math.round(Math.min(bandH * 0.42, W * 0.05)), p.onSecondary);
-    return;
-  }
+    drawBrand(ctx, spec, card.x + pad, card.y + card.h - pad - brandH / 2, brandH, p.primary);
+  },
 
-  if (template === "gradyan") {
-    // Geçiş durakları orana göre kaydırılır: diagonelin ~share kadarı ana renk.
+  // Yarı fotoğraf, yarı marka paneli
+  bolunmus: (ctx, spec, p, L, accent) => {
+    const { W, H, m } = L;
+    ctx.fillStyle = p.primary;
+    ctx.fillRect(0, 0, W, H);
+    const bar = Math.max(10, Math.round(Math.min(W, H) * (0.012 + accent * 0.03)));
+    if (L.wide) {
+      const split = Math.round(W * 0.5);
+      paintPhoto(ctx, spec, p, 0, 0, split, H);
+      ctx.fillStyle = p.secondary;
+      ctx.fillRect(split - bar / 2, 0, bar, H);
+      drawTextBlock(ctx, spec, { x: split + m * 0.8, y: m, w: W - split - m * 1.6, h: H - 2 * m - L.footerH }, p.onPrimary, p.onPrimary, "middle");
+      drawBrand(ctx, spec, split + m * 0.8, H - m - L.footerH / 2, L.footerH, p.onPrimary);
+      return;
+    }
+    const split = Math.round(H * (L.tall ? 0.48 : 0.52));
+    paintPhoto(ctx, spec, p, 0, 0, W, split);
+    ctx.fillStyle = p.secondary;
+    ctx.fillRect(0, split - bar / 2, W, bar);
+    const y = split + Math.round(m * 0.7);
+    drawTextBlock(ctx, spec, { x: m, y, w: W - 2 * m, h: L.contentBottom - y }, p.onPrimary, p.onPrimary, "middle");
+    drawBrand(ctx, spec, m, L.footerY, L.footerH, p.onPrimary);
+  },
+
+  // Dev tipografi + renkli daire
+  tipografi: (ctx, spec, p, L, accent) => {
+    const { W, H, m } = L;
+    ctx.fillStyle = p.primary;
+    ctx.fillRect(0, 0, W, H);
+    const base = L.wide ? H * 0.46 : W * 0.34;
+    const r = base * (0.72 + accent * 1.1);
+    const cx = L.wide ? W * 0.8 : W - m * 0.2 - r * 0.45;
+    const cy = L.wide ? H * 0.5 : L.tall ? L.top + r * 0.55 : m + r * 0.5;
+    ctx.fillStyle = p.secondary;
+    circle(ctx, cx, cy, r);
+    ctx.fill();
+    if (spec.background && spec.backgroundSize) {
+      paintPhoto(ctx, spec, p, cx - r * 0.86, cy - r * 0.86, r * 1.72, r * 1.72, r * 0.86);
+    }
+    ctx.strokeStyle = p.onPrimary;
+    ctx.globalAlpha = 0.16;
+    ctx.lineWidth = 3;
+    circle(ctx, L.wide ? W * 0.12 : m * 0.4, H - L.bottom * 0.6, Math.min(W, H) * 0.22);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    const boxTop = L.wide ? m : Math.round(H * (L.tall ? 0.34 : 0.36));
+    const startY = drawTextBlock(
+      ctx,
+      spec,
+      { x: m, y: boxTop, w: L.wide ? W * 0.52 - m : W - 2 * m, h: L.contentBottom - boxTop },
+      p.onPrimary,
+      p.onPrimary,
+      "bottom"
+    );
+    if (startY !== null) accentBar(ctx, m, startY - Math.round(m * 0.5), Math.round(W * 0.12), Math.max(9, Math.round(W * 0.011)), p.secondary);
+    drawBrand(ctx, spec, m, L.footerY, L.footerH, p.onPrimary);
+  },
+
+  // Kampanya rozeti (alt yazı rozette)
+  rozet: (ctx, spec, p, L) => {
+    const { W, H, m } = L;
+    paintPhoto(ctx, spec, p, 0, 0, W, H);
+    ctx.fillStyle = p.primary;
+    ctx.globalAlpha = 0.42;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+    verticalScrim(ctx, 0, 0, W, H, [
+      [0.3, "rgba(0,0,0,0)"],
+      [1, "rgba(0,0,0,0.62)"],
+    ]);
+    const R = Math.min(W, H) * (L.wide ? 0.3 : 0.2);
+    const cx = L.wide ? W * 0.8 : W - m - R * 0.95;
+    const cy = L.wide ? H * 0.46 : L.tall ? L.top + R : m + R * 0.95;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((-10 * Math.PI) / 180);
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 30;
+    ctx.shadowOffsetY = 10;
+    ctx.fillStyle = p.secondary;
+    circle(ctx, 0, 0, R);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.strokeStyle = p.onSecondary;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = Math.max(3, R * 0.03);
+    ctx.setLineDash([R * 0.08, R * 0.07]);
+    circle(ctx, 0, 0, R * 0.88);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    const sub = spec.subline.trim();
+    if (sub) {
+      const fit = fitText(ctx, sub, R * 1.45, R * 1.25, R * 0.62, 18, 800);
+      ctx.font = `800 ${fit.size}px ${FONT}`;
+      ctx.fillStyle = p.onSecondary;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      let y = -fit.height / 2;
+      for (const line of fit.lines) {
+        ctx.fillText(line, 0, y);
+        y += fit.size * LINE_HEIGHT;
+      }
+    }
+    ctx.restore();
+    const boxTop = Math.round(H * 0.42);
+    drawTextBlock(
+      ctx,
+      { ...spec, subline: "" },
+      { x: m, y: boxTop, w: L.wide ? W * 0.56 : W - 2 * m, h: L.contentBottom + L.footerH * 0.6 - boxTop },
+      "#ffffff",
+      "#ffffff",
+      "bottom"
+    );
+    drawBrand(ctx, spec, m, L.footerY, L.footerH, "#ffffff");
+  },
+
+  // Fotoğraf üstünde yarı saydam cam panel
+  cam: (ctx, spec, p, L) => {
+    const { W, H, m } = L;
+    paintPhoto(ctx, spec, p, 0, 0, W, H);
+    ctx.fillStyle = "rgba(0,0,0,0.30)";
+    ctx.fillRect(0, 0, W, H);
+    const w = L.wide ? Math.round(W * 0.64) : W - 2 * m;
+    const h = Math.round(H * (L.wide ? 0.64 : L.tall ? 0.3 : 0.5));
+    const x = Math.round((W - w) / 2);
+    const y = L.tall ? Math.round(L.top + (H - L.top - L.bottom - h) / 2) : Math.round((H - h) / 2);
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.25)";
+    ctx.shadowBlur = 40;
+    ctx.fillStyle = "rgba(255,255,255,0.17)";
+    shape(ctx, x, y, w, h, Math.round(m * 0.7));
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 3;
+    shape(ctx, x, y, w, h, Math.round(m * 0.7));
+    ctx.stroke();
+    const pad = Math.round(Math.min(w, h) * 0.1);
+    accentBar(ctx, x + w / 2 - Math.round(W * 0.06), y + pad * 0.7, Math.round(W * 0.12), 9, p.secondary);
+    drawTextBlock(ctx, spec, { x: x + pad, y: y + pad + 14, w: w - 2 * pad, h: h - 2 * pad - 14 }, "#ffffff", "#f4f4f5", "middle", "center");
+    drawBrand(ctx, spec, m, L.footerY, L.footerH, "#ffffff");
+  },
+
+  // Kemer biçimli fotoğraf penceresi
+  kemer: (ctx, spec, p, L) => {
+    const { W, H, m } = L;
+    ctx.fillStyle = mix(p.primary, "#ffffff", 0.92);
+    ctx.fillRect(0, 0, W, H);
+    const archW = L.wide ? Math.round(H * 0.6) : Math.round(W * 0.62);
+    const archH = L.wide ? H - 2 * m : Math.round(H * (L.tall ? 0.46 : 0.54));
+    const archX = L.wide ? Math.round(W * 0.56) : Math.round((W - archW) / 2);
+    const archY = L.wide ? m : L.tall ? L.top : m;
+    const radii = [archW / 2, archW / 2, Math.round(m * 0.25), Math.round(m * 0.25)];
+    ctx.fillStyle = p.secondary;
+    shape(ctx, archX + 16, archY + 16, archW, archH, radii);
+    ctx.fill();
+    paintPhoto(ctx, spec, p, archX, archY, archW, archH, radii);
+    const dark = DARK(p);
+    if (L.wide) {
+      const startY = drawTextBlock(ctx, spec, { x: m, y: m, w: archX - 2 * m, h: H - 2 * m - L.footerH }, dark, "#52525b", "middle");
+      if (startY !== null) accentBar(ctx, m, startY - Math.round(m * 0.5), Math.round(W * 0.08), 10, p.secondary);
+      drawBrand(ctx, spec, m, H - m - L.footerH / 2, L.footerH, p.primary);
+      return;
+    }
+    const y = archY + archH + Math.round(m * 0.75);
+    drawTextBlock(ctx, spec, { x: m, y, w: W - 2 * m, h: L.contentBottom - y }, dark, "#52525b", "middle", "center");
+    drawBrand(ctx, spec, m, L.footerY, L.footerH, p.primary);
+  },
+
+  // Hafif eğik polaroid kartı
+  polaroid: (ctx, spec, p, L) => {
+    const { W, H, m } = L;
+    const bg = ctx.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, p.primary);
+    bg.addColorStop(1, mix(p.primary, p.secondary, 0.4));
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = p.secondary;
+    ctx.globalAlpha = 0.25;
+    circle(ctx, W * 0.92, H * 0.12, Math.min(W, H) * 0.3);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    const cardW = Math.round(L.wide ? H * 0.68 : W * (L.tall ? 0.78 : 0.68));
+    const fp = Math.round(cardW * 0.055);
+    const photoW = cardW - 2 * fp;
+    const photoH = Math.round(photoW * 0.86);
+    const capH = Math.round(cardW * 0.3);
+    const cardH = fp + photoH + capH;
+    const cx = L.wide ? Math.round(W * 0.3) : Math.round(W / 2);
+    const cy = L.wide ? Math.round(H / 2) : L.tall ? Math.round((L.top + H - L.bottom) / 2 - H * 0.03) : Math.round(H * 0.45);
+    const x = cx - cardW / 2;
+    const y = cy - cardH / 2;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((-3.5 * Math.PI) / 180);
+    ctx.translate(-cx, -cy);
+    ctx.shadowColor = "rgba(0,0,0,0.38)";
+    ctx.shadowBlur = 50;
+    ctx.shadowOffsetY = 18;
+    ctx.fillStyle = "#ffffff";
+    shape(ctx, x, y, cardW, cardH, Math.round(cardW * 0.012));
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    paintPhoto(ctx, spec, p, x + fp, y + fp, photoW, photoH);
+    drawTextBlock(
+      ctx,
+      { ...spec, textScale: Math.min(spec.textScale ?? 1, 0.75) },
+      { x: x + fp * 1.4, y: y + fp + photoH + capH * 0.1, w: cardW - fp * 2.8, h: capH * 0.8 },
+      DARK(p),
+      "#52525b",
+      "middle",
+      "center"
+    );
+    ctx.fillStyle = p.secondary;
+    ctx.globalAlpha = 0.9;
+    ctx.save();
+    ctx.translate(cx, y);
+    ctx.rotate((5 * Math.PI) / 180);
+    ctx.fillRect(-cardW * 0.14, -22, cardW * 0.28, 46);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    if (L.wide) {
+      const bx = Math.round(W * 0.56);
+      drawTextBlock(ctx, spec, { x: bx, y: m, w: W - bx - m, h: H - 2 * m - L.footerH }, p.onPrimary, p.onPrimary, "middle");
+      drawBrand(ctx, spec, bx, H - m - L.footerH / 2, L.footerH, p.onPrimary);
+    } else {
+      drawBrand(ctx, spec, m, L.footerY, L.footerH, p.onPrimary);
+    }
+  },
+
+  // Fotoğrafın ortasından geçen eğik duyuru bandı
+  bant: (ctx, spec, p, L) => {
+    const { W, H, m } = L;
+    paintPhoto(ctx, spec, p, 0, 0, W, H);
+    ctx.fillStyle = "rgba(0,0,0,0.30)";
+    ctx.fillRect(0, 0, W, H);
+    const cy = Math.round(H * (L.tall ? 0.5 : 0.52));
+    const bh = Math.round(H * (L.wide ? 0.42 : L.tall ? 0.27 : 0.34));
+    const tilt = ((L.wide ? -4 : -6) * Math.PI) / 180;
+    // arka ince bant (ana renk)
+    ctx.save();
+    ctx.translate(W / 2, cy);
+    ctx.rotate(-tilt * 0.6);
+    ctx.translate(-W / 2, -cy);
+    ctx.fillStyle = p.primary;
+    ctx.fillRect(-W * 0.2, cy - bh / 2 - 26, W * 1.4, bh + 52);
+    ctx.restore();
+    // ön bant (yardımcı renk) ve yazı
+    ctx.save();
+    ctx.translate(W / 2, cy);
+    ctx.rotate(tilt);
+    ctx.translate(-W / 2, -cy);
+    ctx.shadowColor = "rgba(0,0,0,0.3)";
+    ctx.shadowBlur = 30;
+    ctx.fillStyle = p.secondary;
+    ctx.fillRect(-W * 0.2, cy - bh / 2, W * 1.4, bh);
+    ctx.shadowColor = "transparent";
+    drawTextBlock(
+      ctx,
+      spec,
+      { x: m * 1.2, y: cy - bh / 2 + bh * 0.08, w: W - 2.4 * m, h: bh * 0.84 },
+      p.onSecondary,
+      p.onSecondary,
+      "middle",
+      "center"
+    );
+    ctx.restore();
+    drawBrand(ctx, spec, m, L.tall ? L.top : m + L.footerH / 2, L.footerH, "#ffffff");
+  },
+
+  // Marka zemini içinde yuvarlak köşeli fotoğraf
+  "cerceve-foto": (ctx, spec, p, L) => {
+    const { W, H, m } = L;
+    ctx.fillStyle = p.primary;
+    ctx.fillRect(0, 0, W, H);
+    const i = Math.round(m * 0.8);
+    const radius = Math.round(m * 0.6);
+    const box = L.wide
+      ? { x: i, y: i, w: Math.round(W * 0.5) - i, h: H - 2 * i }
+      : { x: i, y: L.tall ? 150 : i, w: W - 2 * i, h: Math.round(H * (L.tall ? 0.5 : 0.58)) };
+    ctx.strokeStyle = p.secondary;
+    ctx.lineWidth = 6;
+    shape(ctx, box.x - 10, box.y - 10, box.w + 20, box.h + 20, radius + 8);
+    ctx.stroke();
+    paintPhoto(ctx, spec, p, box.x, box.y, box.w, box.h, radius);
+    if (L.wide) {
+      const bx = box.x + box.w + m;
+      drawTextBlock(ctx, spec, { x: bx, y: m, w: W - bx - m, h: H - 2 * m - L.footerH }, p.onPrimary, p.onPrimary, "middle");
+      drawBrand(ctx, spec, bx, H - m - L.footerH / 2, L.footerH, p.onPrimary);
+      return;
+    }
+    const y = box.y + box.h + Math.round(m * 0.7);
+    const startY = drawTextBlock(ctx, spec, { x: m, y, w: W - 2 * m, h: L.contentBottom - y }, p.onPrimary, p.onPrimary, "middle");
+    if (startY !== null) accentBar(ctx, m, startY - Math.round(m * 0.35), Math.round(W * 0.1), 9, p.secondary);
+    drawBrand(ctx, spec, m, L.footerY, L.footerH, p.onPrimary);
+  },
+
+  // Açık zemin, ince çizgiler, sade tipografi
+  minimal: (ctx, spec, p, L) => {
+    const { W, H, m } = L;
+    ctx.fillStyle = mix(p.primary, "#ffffff", 0.95);
+    ctx.fillRect(0, 0, W, H);
+    const inset = Math.round(m * 0.55);
+    ctx.strokeStyle = p.primary;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(inset, inset, W - 2 * inset, H - 2 * inset);
+    ctx.globalAlpha = 1;
+    const topRow = L.tall ? L.top : m + L.footerH * 0.2;
+    drawBrand(ctx, spec, m, topRow + L.footerH / 2, L.footerH, p.primary);
+    ctx.fillStyle = p.primary;
+    ctx.globalAlpha = 0.25;
+    ctx.fillRect(m, topRow + L.footerH + 18, W - 2 * m, 2);
+    ctx.globalAlpha = 1;
+    const y = topRow + L.footerH + Math.round(m * 0.9);
+    const startY = drawTextBlock(ctx, spec, { x: m, y, w: W - 2 * m, h: L.contentBottom - y }, DARK(p), "#52525b", "middle");
+    if (startY !== null) accentBar(ctx, m, startY - Math.round(m * 0.45), Math.round(W * 0.1), 10, p.secondary);
+    ctx.fillStyle = p.primary;
+    ctx.globalAlpha = 0.25;
+    ctx.fillRect(m, L.footerY, W - 2 * m, 2);
+    ctx.globalAlpha = 1;
+  },
+
+  // Dev tırnak işareti ve ortalı yazı
+  alinti: (ctx, spec, p, L) => {
+    const { W, H, m } = L;
     const g = ctx.createLinearGradient(0, 0, W, H);
     g.addColorStop(0, p.primary);
-    g.addColorStop(share * 0.75, mix(p.primary, p.secondary, 0.12));
-    g.addColorStop(share, mix(p.primary, p.secondary, 0.5));
-    g.addColorStop(Math.min(0.98, share + accent * 0.45), mix(p.primary, p.secondary, 0.88));
-    g.addColorStop(1, p.secondary);
+    g.addColorStop(1, mix(p.primary, p.secondary, 0.55));
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
-    const on = contrastText(mix(p.primary, p.secondary, share));
-    const textBottom = H - bottom - footerH - Math.round(W * 0.04);
-    drawTextBlock(ctx, spec, { x: m, y: top, w: W - 2 * m, h: textBottom - top }, on, on, "middle");
-    // Yardımcı renk vurgu çizgisi: kalınlık oranla artar.
-    ctx.fillStyle = on;
-    ctx.globalAlpha = 0.25 + accent * 0.6;
-    ctx.fillRect(m, textBottom + Math.round(W * 0.02), Math.round(W * (0.14 + accent * 0.3)), Math.max(8, Math.round(W * accent * 0.02)));
-    ctx.globalAlpha = 1;
-    drawBrand(ctx, spec, m, H - bottom - footerH / 2, footerH, on);
-    return;
-  }
-
-  if (template === "diyagonal") {
-    // Eğik kesitin ortalama sınırı share noktasındadır; alan oranı yaklaşık korunur.
-    const photoBase = drawCompositeBase(ctx, spec, p, W, H);
-    const slant = Math.min(W * 0.12, H * 0.08);
-    ctx.beginPath();
-    ctx.moveTo(W * share + slant, 0);
-    ctx.lineTo(W, 0);
-    ctx.lineTo(W, H);
-    ctx.lineTo(W * share - slant, H);
-    ctx.closePath();
+    const on = contrastText(mix(p.primary, p.secondary, 0.25));
+    const qSize = Math.round(Math.min(W, H) * 0.5);
+    ctx.font = `900 ${qSize}px Georgia, "Times New Roman", serif`;
     ctx.fillStyle = p.secondary;
-    ctx.fill();
-    const textColor = photoBase ? "#ffffff" : p.onPrimary;
-    drawTextBlock(ctx, spec, { x: m, y: top, w: W * share - 2 * m, h: H - top - bottom }, textColor, textColor, "middle");
-    drawBrand(ctx, spec, m, H - bottom / 2, footerH, textColor);
-    return;
-  }
-
-  if (template === "katmanli") {
-    const photoBase = drawCompositeBase(ctx, spec, p, W, H);
-    const topH = Math.round(H * Math.max(0.16, share * 0.32));
-    const bottomH = Math.round(H * accent * 0.44);
-    const stripeH = Math.max(18, Math.round(H * accent * 0.08));
-    ctx.fillStyle = p.secondary;
-    ctx.fillRect(0, 0, W, topH);
-    ctx.globalAlpha = 0.9;
-    ctx.fillRect(0, Math.round(H * 0.54), Math.round(W * (0.46 + accent * 0.38)), stripeH);
-    ctx.globalAlpha = 1;
-    ctx.fillRect(0, H - bottomH, W, bottomH);
-    drawBrand(ctx, spec, m, topH / 2, Math.min(topH * 0.56, W * 0.075), p.onSecondary);
-    const textColor = photoBase ? "#ffffff" : p.onPrimary;
-    drawTextBlock(ctx, spec, { x: m, y: topH + m, w: W - 2 * m, h: H - topH - bottomH - 2 * m }, textColor, textColor, "middle");
-    return;
-  }
-
-  if (template === "kose") {
-    const photoBase = drawCompositeBase(ctx, spec, p, W, H);
-    const corner = Math.sqrt(accent / 4) * Math.min(W, H);
-    ctx.fillStyle = p.secondary;
-    ctx.fillRect(0, 0, corner, corner * 0.72);
-    ctx.fillRect(W - corner, 0, corner, corner * 0.72);
-    ctx.fillRect(0, H - corner * 0.72, corner, corner * 0.72);
-    ctx.fillRect(W - corner, H - corner * 0.72, corner, corner * 0.72);
-    const notch = Math.max(10, Math.round(corner * 0.12));
-    ctx.fillRect(m, H * 0.5, Math.round(W * accent * 0.18), notch);
-    const textColor = photoBase ? "#ffffff" : p.onPrimary;
-    drawTextBlock(ctx, spec, { x: m, y: top + corner * 0.36, w: W - 2 * m, h: H - top - bottom - corner * 0.72 }, textColor, textColor, "middle");
-    drawBrand(ctx, spec, m, H - bottom / 2, footerH, textColor);
-    return;
-  }
-
-  if (template === "editorial") {
-    const photoBase = drawCompositeBase(ctx, spec, p, W, H);
-    if (!photoBase) {
-      ctx.fillStyle = p.secondary;
-      ctx.fillRect(0, 0, W, H);
-    }
-    const inset = Math.round(W * (0.06 + accent * 0.08));
-    const cardY = Math.round(H * 0.12);
-    const cardH = Math.round(H * 0.76);
-    ctx.fillStyle = p.primary;
-    ctx.beginPath();
-    ctx.roundRect(inset, cardY, W - inset * 2, cardH, Math.round(W * 0.045));
-    ctx.fill();
-    ctx.fillStyle = p.secondary;
-    ctx.fillRect(inset + m * 0.55, cardY + Math.round(cardH * 0.13), Math.max(22, W * accent * 0.28), Math.max(9, W * 0.012));
-    drawTextBlock(ctx, spec, { x: inset + m * 0.55, y: cardY + Math.round(cardH * 0.2), w: W - inset * 2 - m * 1.1, h: cardH * 0.58 }, p.onPrimary, p.onPrimary, "middle");
-    drawBrand(ctx, spec, inset + m * 0.55, cardY + cardH - m * 0.55, footerH * 0.72, p.onPrimary);
-    return;
-  }
-
-  if (template === "cift-cerceve") {
-    const photoBase = drawCompositeBase(ctx, spec, p, W, H);
-    const outer = Math.max(10, Math.round(W * accent * 0.08));
-    const inner = Math.max(5, Math.round(W * accent * 0.035));
-    ctx.strokeStyle = p.secondary;
-    ctx.lineWidth = outer;
-    ctx.strokeRect(outer / 2, outer / 2, W - outer, H - outer);
-    ctx.globalAlpha = 0.72;
-    ctx.lineWidth = inner;
-    const gap = Math.round(W * 0.06);
-    ctx.strokeRect(gap, gap, W - 2 * gap, H - 2 * gap);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = p.secondary;
-    ctx.fillRect(W * 0.12, H * 0.17, W * accent * 0.55, Math.max(8, W * 0.012));
-    const textColor = photoBase ? "#ffffff" : p.onPrimary;
-    drawTextBlock(ctx, spec, { x: m * 1.25, y: top + H * 0.1, w: W - m * 2.5, h: H - top - bottom - H * 0.1 }, textColor, textColor, "middle");
-    drawBrand(ctx, spec, m * 1.25, H - bottom / 2, footerH, textColor);
-    return;
-  }
-
-  if (template === "kolaj") {
-    const photoBase = drawCompositeBase(ctx, spec, p, W, H);
-    const topH = Math.round(H * accent * 0.28);
-    const sideW = Math.round(W * accent * 0.2);
-    const bottomH = Math.round(H * accent * 0.25);
-    ctx.fillStyle = p.secondary;
-    ctx.fillRect(0, 0, W, topH);
-    ctx.globalAlpha = 0.88;
-    ctx.fillRect(W - sideW, topH, sideW, H - topH - bottomH);
-    ctx.globalAlpha = 1;
-    ctx.fillRect(0, H - bottomH, W, bottomH);
-    drawBrand(ctx, spec, m, topH / 2, Math.min(topH * 0.6, W * 0.07), p.onSecondary);
-    const textColor = photoBase ? "#ffffff" : p.onPrimary;
-    drawTextBlock(ctx, spec, { x: m, y: topH + m, w: W - sideW - m * 2, h: H - topH - bottomH - 2 * m }, textColor, textColor, "middle");
-    drawBrand(ctx, spec, m, H - bottomH / 2, footerH * 0.68, p.onSecondary);
-    return;
-  }
-
-  if (template === "cerceve") {
-    // Zemin ana rengin çok açık tonu; çerçeve ve başlık bandı yardımcı renk.
-    const paper = mix(p.primary, "#ffffff", 0.93);
-    ctx.fillStyle = paper;
-    ctx.fillRect(0, 0, W, H);
-    const headerH = Math.round(H * accent * 0.42);
-    ctx.fillStyle = p.secondary;
-    ctx.fillRect(0, 0, W, headerH);
-    ctx.strokeStyle = p.primary;
-    ctx.lineWidth = Math.max(4, Math.round(W * 0.016 * share));
-    const inset = Math.round(W * 0.035);
-    ctx.strokeRect(inset, inset, W - 2 * inset, H - 2 * inset);
-    drawBrand(ctx, spec, m, headerH / 2, Math.round(headerH * 0.5), p.onSecondary);
-    const textTop = headerH + m;
-    const textBottom = H - (tall ? bottom : m) - Math.round(W * 0.04);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("“", m * 0.8, (L.tall ? L.top : m * 0.3) - qSize * 0.05);
+    const y = (L.tall ? L.top : m) + Math.round(qSize * 0.55);
     drawTextBlock(
       ctx,
       spec,
-      { x: m, y: textTop, w: W - 2 * m, h: Math.max(120, textBottom - textTop) },
-      mix(p.primary, "#101010", 0.55),
-      "#4b4b4b",
-      "middle"
+      { x: m * 1.2, y, w: W - 2.4 * m, h: L.contentBottom - y },
+      on,
+      on,
+      "middle",
+      "center"
     );
-    return;
-  }
+    drawBrand(ctx, spec, m, L.footerY, L.footerH, on);
+  },
+};
 
-  if (template === "serit") {
-    // Üst bant ana renk (payı share ile orantılı), dikey vurgu yardımcı renk.
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, W, H);
-    const bandH = tall ? Math.round(220 + 260 * share) : Math.round(H * share * 0.17);
-    ctx.fillStyle = p.primary;
-    ctx.fillRect(0, 0, W, bandH);
-    const bandCenter = tall ? bandH - 90 : bandH / 2;
-    drawBrand(ctx, spec, m, bandCenter, Math.round(W * 0.075), p.onPrimary);
-    const textTop = bandH + m;
-    const textBottom = H - (tall ? bottom : m);
-    const barW = Math.max(10, Math.round(W * accent * 0.09));
-    ctx.fillStyle = p.secondary;
-    ctx.fillRect(m, textTop, barW, textBottom - textTop);
-    drawTextBlock(
-      ctx,
-      spec,
-      { x: m + barW + 30, y: textTop, w: W - 2 * m - barW - 30, h: textBottom - textTop },
-      "#111111",
-      "#4b4b4b",
-      "middle"
-    );
-    return;
-  }
-
-  // fotograf (arka plan var)
-  const bg = spec.background as CanvasImageSource;
-  const size = spec.backgroundSize as { w: number; h: number };
-  const r = coverRect(size.w, size.h, W, H);
-  ctx.drawImage(bg, r.sx, r.sy, r.sw, r.sh, 0, 0, W, H);
-  const shade = ctx.createLinearGradient(0, 0, 0, H);
-  shade.addColorStop(0, "rgba(0,0,0,0.18)");
-  shade.addColorStop(0.45, "rgba(0,0,0,0.25)");
-  shade.addColorStop(1, "rgba(0,0,0,0.72)");
-  ctx.fillStyle = shade;
-  ctx.fillRect(0, 0, W, H);
-  // Ana renk tonu üst (geniş) bölgede, yardımcı renk dar vurgu bandında.
-  ctx.fillStyle = p.primary;
-  ctx.globalAlpha = 0.16 + share * 0.12;
-  ctx.fillRect(0, 0, W, Math.round(H * share * 0.55));
-  ctx.globalAlpha = 1;
-  const textBottomY = H - bottom - footerH - Math.round(W * 0.04);
-  const textTopY = drawTextBlock(
-    ctx,
-    spec,
-    { x: m, y: textBottomY - Math.round(H * 0.4), w: W - 2 * m, h: Math.round(H * 0.4) },
-    "#ffffff",
-    "#f1f1f1",
-    "bottom"
-  );
-  if (textTopY !== null) {
-    ctx.fillStyle = p.secondary;
-    ctx.fillRect(m, textTopY - 36, Math.round(W * (0.12 + accent * 0.34)), Math.max(8, Math.round(W * accent * 0.022)));
-  }
-  drawBrand(ctx, spec, m, H - bottom - footerH / 2, footerH, "#ffffff");
+export function drawVisual(ctx: CanvasRenderingContext2D, spec: VisualSpec): void {
+  const p = paletteOf(spec);
+  const { accent } = sharesOf(spec, p);
+  const L = layoutOf(spec);
+  ctx.clearRect(0, 0, L.W, L.H);
+  ctx.save();
+  (painters[spec.template] ?? painters[DEFAULT_TEMPLATE])(ctx, spec, p, L, accent);
+  ctx.restore();
 }

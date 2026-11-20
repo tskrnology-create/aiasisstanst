@@ -8,7 +8,10 @@ import { businessStore, type StoredBusiness } from "@/lib/business-store";
 import { STATUS_LABEL, type ContentRow } from "@/lib/library-utils";
 import {
   FORMATS,
+  DEFAULT_PHOTO_TEMPLATE,
+  DEFAULT_TEMPLATE,
   TEMPLATE_USAGE,
+  templateWantsPhoto,
   drawVisual,
   type FormatId,
   type TemplateId,
@@ -92,7 +95,7 @@ function VisualCreatorWorkspace({
   const [headline, setHeadline] = useState("");
   const [subline, setSubline] = useState("");
   const [format, setFormat] = useState<FormatId>("post");
-  const [template, setTemplate] = useState<TemplateId>("gradyan");
+  const [template, setTemplate] = useState<TemplateId>(DEFAULT_TEMPLATE);
   // Ana rengin yüzdesi 50–90 arasında tek tek ayarlanır; yardımcı renk kalandır.
   const [ratioId, setRatioId] = useState<RatioId>(DEFAULT_RATIO);
   const [showStorySafeArea, setShowStorySafeArea] = useState(true);
@@ -191,6 +194,11 @@ function VisualCreatorWorkspace({
     [headline, subline, biz, ratioId, logo, background]
   );
 
+  // Arka plan eklenince, fotoğrafı öne çıkarmayan bir şablondaysak (Büyük yazı, Minimal, Alıntı) fotoğraflı varsayılana geçilir.
+  function applyPhotoTemplate() {
+    setTemplate((current) => (templateWantsPhoto(current) ? current : DEFAULT_PHOTO_TEMPLATE));
+  }
+
   function pickContent(id: string, src: TextSource = source) {
     setContentId(id);
     const c = contents.find((x) => x.id === id);
@@ -220,7 +228,7 @@ function VisualCreatorWorkspace({
       });
       const img = await loadImage(body.image);
       setBackground(img);
-      setTemplate("fotograf");
+      applyPhotoTemplate();
       setNotice("Arka plan hazır. Yazıyı ve şablonu değiştirebilirsiniz.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bilinmeyen hata.");
@@ -248,7 +256,7 @@ function VisualCreatorWorkspace({
       loadImage(reader.result as string)
         .then((img) => {
           setBackground(img);
-          setTemplate("fotograf");
+          applyPhotoTemplate();
         })
         .catch(() => setError("Fotoğraf okunamadı."));
     };
@@ -514,9 +522,9 @@ function VisualCreatorWorkspace({
               <p className="text-sm font-medium text-ink">Şablon</p>
               <TemplateGallery value={template} onChange={setTemplate} format={format} base={thumbBase} />
               <p className={hintClass}>{TEMPLATE_USAGE[template]}</p>
-              {template === "fotograf" && !background && (
+              {templateWantsPhoto(template) && !background && (
                 <Callout tone="info">
-                  Bu şablon bir arka plan fotoğrafı ister.{" "}
+                  Bu şablon fotoğrafla çok daha iyi görünür; şimdilik marka renkli yedek zemin gösteriliyor.{" "}
                   <button type="button" className="font-semibold underline" onClick={() => setTab("background")}>
                     Arka plan ekle →
                   </button>
@@ -578,12 +586,14 @@ function VisualCreatorWorkspace({
             {bgMode === "media" && (
               <MediaPicker
                 business={biz}
+                colors={biz.brand_colors}
+                snapshotSize={{ width: FORMATS[format].width, height: FORMATS[format].height }}
                 disabled={working}
                 onImageSelected={(img) => {
                   setBackground(img);
-                  setTemplate("fotograf");
+                  applyPhotoTemplate();
                   setError(null);
-                  setNotice("Pixabay fotoğrafı eklendi. Şablonu Tasarım sekmesinden değiştirebilirsiniz.");
+                  setNotice("Arka plan eklendi. Şablonu Tasarım sekmesinden değiştirebilirsiniz.");
                 }}
                 onContentSaved={(row) => setContents((current) => [row, ...current.filter((item) => item.id !== row.id)])}
               />

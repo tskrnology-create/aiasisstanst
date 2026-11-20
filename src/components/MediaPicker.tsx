@@ -4,6 +4,8 @@ import { useRef, useState, type KeyboardEvent } from "react";
 import { getSupabase } from "@/lib/supabase";
 import type { StoredBusiness } from "@/lib/business-store";
 import type { ContentRow } from "@/lib/library-utils";
+import { DEFAULT_RATIO, readPalette } from "@/lib/brand-palette";
+import { snapshotModel } from "@/lib/model-snapshot";
 import { Button, Callout, cx, inputClass } from "./Ui";
 
 type MediaTab = "photo" | "video" | "model";
@@ -53,11 +55,17 @@ async function imageFromBlob(blob: Blob): Promise<HTMLImageElement> {
 
 export default function MediaPicker({
   business,
+  colors = [],
+  snapshotSize = { width: 1080, height: 1080 },
   onImageSelected,
   onContentSaved,
   disabled = false,
 }: {
   business: Pick<StoredBusiness, "id" | "content_language">;
+  /** Marka renkleri (3D önizleme zemini için) */
+  colors?: string[];
+  /** Seçili formatın piksel ölçüsü (3D önizleme karesi için) */
+  snapshotSize?: { width: number; height: number };
   onImageSelected: (image: HTMLImageElement) => void;
   onContentSaved: (row: ContentRow) => void;
   disabled?: boolean;
@@ -186,6 +194,20 @@ export default function MediaPicker({
     setError(null);
     setNotice(null);
     try {
+      // 1) Videonun kapak karesi arka plan olur (sunucu üzerinden, tuval bozulmasın diye).
+      const token = await getToken();
+      const frameResponse = await fetch("/api/media/pixabay/frame", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: hit.id }),
+      });
+      if (!frameResponse.ok) {
+        const frameError = await frameResponse.json().catch(() => ({}));
+        throw new Error(frameError.error ?? "Videonun kapak karesi alınamadı.");
+      }
+      const frameImage = await imageFromBlob(await frameResponse.blob());
+
+      // 2) Video kütüphaneye eklenir.
       const { data, error: insertError } = await getSupabase()
         .from("contents")
         .insert({
@@ -206,8 +228,9 @@ export default function MediaPicker({
         .select("*")
         .single();
       if (insertError || !data) throw new Error(`Video kaydedilemedi: ${insertError?.message ?? "kayıt oluşturulamadı"}`);
+      onImageSelected(frameImage);
       onContentSaved(data as ContentRow);
-      setNotice("Video kütüphaneye eklendi; sosyal ağlarda paylaşım yine manuel yapılır.");
+      setNotice("Videonun kapak karesi arka plan yapıldı ve video kütüphaneye eklendi. Paylaşım yine manuel yapılır.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Video kaydedilemedi.");
     } finally {
@@ -258,7 +281,24 @@ export default function MediaPicker({
     setBusyId("model");
     setError(null);
     setNotice(null);
+    let snapshotFailed = false;
     try {
+      // 1) Modelin tek karelik önizlemesi arka plan olur (cihazda üretilir).
+      try {
+        const palette = readPalette(colors, DEFAULT_RATIO);
+        const snapshot = await snapshotModel(file, {
+          width: snapshotSize.width,
+          height: snapshotSize.height,
+          primary: palette.primary,
+          secondary: palette.secondary,
+        });
+        onImageSelected(snapshot);
+      } catch (snapshotError) {
+        console.error("3D önizleme karesi alınamadı:", snapshotError);
+        snapshotFailed = true;
+      }
+
+      // 2) Model özel depoya ve kütüphaneye eklenir.
       const token = await getToken();
       const form = new FormData();
       form.append("file", file, file.name);
@@ -275,7 +315,11 @@ export default function MediaPicker({
       await refreshSavedRow(String(data.id));
       setModelFile(null);
       if (modelInputRef.current) modelInputRef.current.value = "";
-      setNotice("Doğrulanmış 3D model özel depoya ve içerik kütüphanesine eklendi.");
+      setNotice(
+        snapshotFailed
+          ? "3D model kütüphaneye eklendi, ancak önizleme karesi arka plan yapılamadı."
+          : "3D modelin önizleme karesi arka plan yapıldı ve model kütüphaneye eklendi."
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "3D model kütüphaneye kaydedilemedi.");
     } finally {
@@ -375,7 +419,7 @@ export default function MediaPicker({
                         <a href={hit.pageURL} target="_blank" rel="noreferrer" className="shrink-0 font-medium text-brand hover:underline">Kaynak</a>
                       </div>
                       <Button type="button" size="sm" className="w-full" disabled={off} onClick={() => void saveVideo(hit)}>
-                        {busyId === hit.id ? "Ekleniyor…" : "Kütüphaneye ekle"}
+                        {busyId === hit.id ? "Ekleniyor…" : "Arka plan yap + kütüphaneye ekle"}
                       </Button>
                     </div>
                   </article>
@@ -398,7 +442,7 @@ export default function MediaPicker({
         <div className="space-y-3 rounded-xl border border-line bg-surface p-4">
           <p className="text-sm font-medium text-ink">Pixabay 3D kataloğu</p>
           <p className="text-xs leading-relaxed text-muted">
-            Pixabay geliştirici API&apos;si fotoğraf ve video arıyor; 3D modeller için resmi API endpoint&apos;i bulunmadığından katalog yeni sekmede açılır. Modeli Pixabay&apos;den indirin ve buradan yükleyin.
+            Pixabay geliştirici API&apos;si yalnızca fotoğraf ve video arıyor; 3D modeller için API olmadığından katalog yeni sekmede açılır. Modeli indirip aşağıdan seçin: tek tıkla hem önizleme karesi arka plan olur hem de model kütüphaneye eklenir.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="secondary" disabled={off} onClick={open3DSearch}>Pixabay&apos;de 3D model ara ↗</Button>
@@ -427,7 +471,7 @@ export default function MediaPicker({
             <span className="block text-[11px] text-faint">Tek dosyalı .glb · en fazla 50 MB. Doku dosyaları ayrı olan .gltf paketleri şimdilik desteklenmiyor.</span>
           </label>
           <Button type="button" disabled={!modelFile || off} onClick={() => void addModel()}>
-            {busyId === "model" ? "Yükleniyor…" : "3D modeli kütüphaneye ekle"}
+            {busyId === "model" ? "Hazırlanıyor…" : "Arka plan yap + kütüphaneye ekle"}
           </Button>
         </div>
       )}
