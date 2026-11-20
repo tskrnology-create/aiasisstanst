@@ -83,7 +83,7 @@ export interface ChecklistStep {
 
 export function buildChecklist(input: ChecklistInput): { steps: ChecklistStep[]; percent: number } {
   const steps: ChecklistStep[] = [
-    { id: "profile", label: "Marka profilini tamamla", hint: "Ürünler, hedef kitle ve marka sesi yapay zekâyı yönlendirir.", href: "/profil", done: input.profileComplete },
+    { id: "profile", label: "Marka profilini tamamla", hint: "Ürünler, hedef kitle ve marka sesi yapay zekâyı yönlendirir.", href: "/marka", done: input.profileComplete },
     { id: "content", label: "İlk içeriğini üret", hint: "Gönderi, açıklama, hashtag ve reklam metni tek istekte.", href: "/uret", done: input.contentCount > 0 },
     { id: "visual", label: "İlk görselini oluştur", hint: "Şablon seç, marka renklerin ve logonla hazırla.", href: "/gorsel", done: input.visualCount > 0 },
     { id: "plan", label: "İlk paylaşımı planla", hint: "Takvime ekle; zamanı gelince hatırlat.", href: "/takvim", done: input.plannedCount > 0 },

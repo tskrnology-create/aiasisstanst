@@ -221,7 +221,7 @@ export default function Dashboard() {
         title="Önce markanı tanıt"
         description="Yapay zekâ içerik üretmeden önce işletmeni, hedef kitleni ve marka sesini bilmeli. Birkaç dakikanı alır."
         action={
-          <LinkButton href="/profil" variant="primary">
+          <LinkButton href="/marka" variant="primary">
             Marka profilini oluştur
           </LinkButton>
         }
@@ -495,7 +495,7 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
           <SectionCard
             title="Marka özeti"
             aside={
-              <LinkButton href="/profil" variant="ghost" size="sm">
+              <LinkButton href="/marka" variant="ghost" size="sm">
                 Düzenle
               </LinkButton>
             }

@@ -8,7 +8,8 @@ KOBİ'lerin ve markaların sosyal medya içeriklerini tek bir çalışma alanın
 
 | Alan | Uygulama | Durum ve sınırlar |
 |---|---|---|
-| İşletme / marka profili | `/` | Bir hesapta birden fazla marka, kullanıcıya özel aktif marka seçimi, marka adı, sektör, ürünler, hedef kitle, marka dili, **ana + yardımcı renk**, logo ve sosyal hesaplar. Sosyal hesap kayıtları platform bağlantısı değildir. |
+| İşletme paneli | `/` | Aktif markanın taslak/onaylı içerik sayılarını, yaklaşan ve gecikmiş manuel paylaşım planlarını ve son içerikleri gerçek kayıtlardan gösterir; sosyal performans verisi uydurmaz. |
+| İşletme / marka profili | `/marka` (`/profil` eski bağlantısı yönlenir) | Bir hesapta birden fazla marka, kullanıcıya özel aktif marka seçimi, marka adı, sektör, ürünler, hedef kitle, marka dili, **ana + yardımcı renk**, logo ve sosyal hesaplar. Sosyal hesap kayıtları platform bağlantısı değildir. |
 | İçerik üretimi | `/uret` | Marka profiline göre gönderi, açıklama, hashtag, reklam ve hikâye metni; alternatif tonlar; kütüphaneye taslak olarak kaydetme. Gemini → DeepSeek → OpenAI yedek sırası. |
 | Görsel oluşturma | `/gorsel` | Üç adımlı içerik/tasarım/arka plan akışı; marka renkleri/logo ve oran slider'ı, şablon galerisi, metin düzenleme ve canlı önizleme; Pixabay fotoğraf/video araması; seçilen fotoğraf, video posteri veya GLB model karesi arka plan olurken medya özel depoya ve kütüphaneye kaydedilir; PNG indirme veya özel depoda çıktı kaydı. |
 | İçerik takvimi | `/takvim` | Ay/hafta görünümü, kayıtlı sosyal hesap seçimi, hatırlatma zamanı, saat değiştirme ve manuel “paylaşıldı” günlüğü (`posted_at`, isteğe bağlı `post_url`). Hatırlatma yalnızca uygulama içindedir; e-posta/push bildirimi yoktur. |

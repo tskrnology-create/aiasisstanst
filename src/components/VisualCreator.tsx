@@ -346,7 +346,7 @@ function VisualCreatorWorkspace({
     return (
       <Callout tone="warning">
         Görsel oluşturmak için önce{" "}
-        <Link href="/profil" className="font-semibold underline underline-offset-2">
+        <Link href="/marka" className="font-semibold underline underline-offset-2">
           işletme profilinizi kaydedin →
         </Link>
       </Callout>

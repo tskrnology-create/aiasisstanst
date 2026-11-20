@@ -114,6 +114,9 @@ function ResultCard({ row, headline }: { row: GeneratedRow; headline?: string })
           )}
           <div className="flex flex-wrap items-center gap-2">
             <CopyButton text={value} label={`${block.label} metnini kopyala`} />
+            <LinkButton href={`/kutuphane?content=${encodeURIComponent(row.id)}`} variant="secondary" size="sm">
+              İçeriği düzenle
+            </LinkButton>
             <LinkButton href="/gorsel" variant="ghost" size="sm">
               <IconImage className="h-3.5 w-3.5" />
               Görselini hazırla

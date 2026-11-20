@@ -23,8 +23,8 @@ import {
 } from "./Icons";
 
 const NAV = [
-  { href: "/", label: "Panel", short: "Panel", icon: IconLayers, description: "Genel bakış" },
-  { href: "/profil", label: "Marka", short: "Marka", icon: IconBuilding, description: "İşletme profili" },
+  { href: "/", label: "İşletme paneli", short: "Panel", icon: IconLayers, description: "Günlük iş özeti" },
+  { href: "/marka", label: "Marka ve hesaplar", short: "Marka", icon: IconBuilding, description: "Marka profili ve sosyal hesaplar" },
   { href: "/uret", label: "İçerik üret", short: "Üret", icon: IconSparkles, description: "Yapay zekâ metinleri" },
   { href: "/gorsel", label: "Görsel", short: "Görsel", icon: IconImage, description: "Tasarım stüdyosu" },
   { href: "/takvim", label: "Takvim", short: "Takvim", icon: IconCalendar, description: "Paylaşım planı" },
@@ -139,10 +139,10 @@ function BusinessSelector({ compact = false }: { compact?: boolean }) {
   }
   if (isBusinessLoading) {
     return <p className="px-1 text-xs text-muted">Markalar yükleniyor…</p>;
-  }
-  if (businesses.length === 0) {
-    return (
-      <Link href="/profil" className="inline-flex rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand-soft dark:text-brand-strong">
+    }
+    if (businesses.length === 0) {
+      return (
+      <Link href="/marka" className="inline-flex rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand-soft dark:text-brand-strong">
         İlk markanı oluştur →
       </Link>
     );
@@ -164,8 +164,9 @@ function BusinessSelector({ compact = false }: { compact?: boolean }) {
           <option key={business.id} value={business.id}>{business.name}</option>
         ))}
       </select>
-      <Link href="/profil" className="inline-flex px-1 text-[11px] font-medium text-muted hover:text-brand dark:hover:text-brand-strong">
-        + Yeni marka ekle
+      <Link href="/marka" className="inline-flex items-center gap-1.5 px-1 text-[11px] font-medium text-muted hover:text-brand dark:hover:text-brand-strong">
+        <IconBuilding className="h-3.5 w-3.5" />
+        Marka profili ve hesaplar
       </Link>
     </div>
   );
@@ -187,7 +188,8 @@ function ManualBadge() {
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const current = NAV.find((item) => item.href === pathname);
+  const current = NAV.find((item) => item.href === pathname) ??
+    (pathname === "/marka" ? { label: "Marka ve sosyal hesaplar" } : undefined);
   const session = useSession();
   const userId = session?.user.id ?? null;
   const [businesses, setBusinesses] = useState<BusinessOption[]>([]);

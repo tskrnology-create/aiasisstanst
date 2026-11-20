@@ -571,7 +571,11 @@ export default function Calendar() {
   const visibleContents = dataReady ? contents : [];
   const visibleAccounts = dataReady ? accounts : [];
   const byDay = useMemo(() => groupByDay(dataReady ? items : []), [dataReady, items]);
-  const reload = () => setVersion((v) => v + 1);
+  const reload = () => {
+    setError(null);
+    setLoadedBusinessId(null);
+    setVersion((v) => v + 1);
+  };
 
   function move(delta: number) {
     setCursor((c) =>
@@ -595,11 +599,20 @@ export default function Calendar() {
     );
   }
 
+  if (error) {
+    return (
+      <Callout tone="error">
+        <p>Takvim verileri yüklenemedi. Eksik veriler nedeniyle yeni plan ekleyemezsiniz.</p>
+        <Button type="button" size="sm" variant="secondary" onClick={reload}>Yeniden dene</Button>
+      </Callout>
+    );
+  }
+
   if (!activeBusinessId) {
     return (
       <Callout tone="warning">
         Takvimi kullanmak için önce{" "}
-        <Link href="/profil" className="font-semibold underline underline-offset-2">
+        <Link href="/marka" className="font-semibold underline underline-offset-2">
           işletme profilinizi kaydedin →
         </Link>
       </Callout>

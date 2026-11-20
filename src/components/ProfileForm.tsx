@@ -226,6 +226,7 @@ function ProfileFormWorkspace({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [newDraft, setNewDraft] = useState(false);
+  const [loadRevision, setLoadRevision] = useState(0);
 
   useEffect(() => {
     if (isBusinessLoading) return;
@@ -237,14 +238,14 @@ function ProfileFormWorkspace({
         setForm(stored ? { ...EMPTY_BUSINESS, ...stored } : { ...EMPTY_BUSINESS });
         setNewDraft(false);
       })
-      .catch((err: Error) => {
-        if (active) setLoadError("Profil yüklenemedi: " + err.message);
+      .catch(() => {
+        if (active) setLoadError("Profil yüklenemedi. İnternet bağlantınızı veya oturumunuzu kontrol edin.");
       })
       .finally(() => {
         if (active) setLoaded(true);
       });
     return () => { active = false; };
-  }, [activeBusinessId, isBusinessLoading]);
+  }, [activeBusinessId, isBusinessLoading, loadRevision]);
 
   function update<K extends keyof StoredBusiness>(key: K, value: StoredBusiness[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -304,17 +305,32 @@ function ProfileFormWorkspace({
     );
   }
 
+  if (loadError) {
+    return (
+      <Callout tone="error">
+        <p>{loadError}</p>
+        <p>Mevcut profil yüklenmeden düzenleme veya kaydetme devre dışıdır.</p>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            setLoadError(null);
+            setLoaded(false);
+            setLoadRevision((revision) => revision + 1);
+          }}
+        >
+          Yeniden dene
+        </Button>
+      </Callout>
+    );
+  }
+
   return (
     <form onSubmit={onSubmit} className="space-y-5" noValidate>
       {newDraft && (
         <Callout tone="info">Yeni marka taslağı oluşturuluyor. Kaydettiğinizde bu marka aktif çalışma alanı olur.</Callout>
       )}
-      {loadError && (
-        <div className="rounded-2xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger">
-          {loadError}
-        </div>
-      )}
-
       <SectionCard
         step="01"
         title="Temel bilgiler"

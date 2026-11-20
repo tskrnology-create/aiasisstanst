@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
   try {
     // Pixabay API yanıtı 24 saat cache edilir; seçilen dosya kalıcı kullanım için Storage'a alınır.
-    const metadataResponse = await fetch(apiUrl, { next: { revalidate: 86_400 }, signal: AbortSignal.timeout(15_000) });
+    const metadataResponse = await fetch(apiUrl, { next: { revalidate: 86_400 }, redirect: "error", signal: AbortSignal.timeout(15_000) });
     if (metadataResponse.status === 429) {
       return json({ error: "Pixabay kullanım sınırına ulaşıldı. Bir dakika sonra yeniden deneyin." }, 429);
     }
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     if (!sourceImage || !isPixabayAsset(sourceImage)) {
       return json({ error: "Görselin indirilebilir adresi geçersiz." }, 502);
     }
-    const imageResponse = await fetch(sourceImage, { signal: AbortSignal.timeout(20_000) });
+    const imageResponse = await fetch(sourceImage, { redirect: "error", signal: AbortSignal.timeout(20_000) });
     if (!imageResponse.ok) return json({ error: "Pixabay görseli indirilemedi." }, 502);
     const declaredLength = Number(imageResponse.headers.get("content-length") ?? 0);
     if (declaredLength > MAX_IMAGE_BYTES) {

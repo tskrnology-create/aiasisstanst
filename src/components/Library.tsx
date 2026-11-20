@@ -109,14 +109,17 @@ function EditArea({
 
 function ItemCard({
   row,
+  initiallyOpen = false,
   onUpdated,
   onDeleted,
 }: {
   row: ContentRow;
+  initiallyOpen?: boolean;
   onUpdated: (row: ContentRow) => void;
   onDeleted: (warning?: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState<boolean | null>(null);
+  const open = manualOpen ?? initiallyOpen;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -227,7 +230,7 @@ function ItemCard({
     >
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setManualOpen((current) => !(current ?? initiallyOpen))}
         aria-expanded={open}
         className="w-full space-y-2.5 rounded-2xl p-4 text-left sm:p-5"
       >
@@ -379,7 +382,14 @@ function LibraryWorkspace({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ContentStatus>("all");
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [targetContentId, setTargetContentId] = useState<string | null>(null);
   const loading = isBusinessLoading || (Boolean(businessId) && !loaded);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      setTargetContentId(new URLSearchParams(window.location.search).get("content"));
+    });
+  }, []);
 
   useEffect(() => {
     if (isBusinessLoading || !businessId) return;
@@ -495,6 +505,7 @@ function LibraryWorkspace({
           <ItemCard
             key={row.id}
             row={row}
+            initiallyOpen={row.id === targetContentId}
             onUpdated={(u) => setRows((all) => all.map((r) => (r.id === u.id ? u : r)))}
             onDeleted={(warning) => {
               setRefreshVersion((version) => version + 1);

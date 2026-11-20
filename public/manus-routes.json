@@ -1,0 +1,11 @@
+{
+  "routes": [
+    { "path": "/", "title": "İşletme paneli" },
+    { "path": "/marka", "title": "Marka ve sosyal hesaplar" },
+    { "path": "/profil", "title": "Marka profili (eski bağlantı yönlendirmesi)" },
+    { "path": "/uret", "title": "İçerik üret" },
+    { "path": "/gorsel", "title": "Görsel stüdyosu" },
+    { "path": "/takvim", "title": "İçerik takvimi" },
+    { "path": "/kutuphane", "title": "İçerik kütüphanesi" }
+  ]
+}
