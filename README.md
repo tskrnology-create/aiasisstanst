@@ -34,7 +34,7 @@ KOBİ'lerin ve markaların sosyal medya içeriklerini tek bir çalışma alanın
    ```
 
 3. `.env.example` dosyasını `.env.local` olarak kopyalayın; Supabase URL/publishable key ve kullanacağınız model sağlayıcı anahtarlarını ekleyin. Pixabay araması için `PIXABAY_API_KEY` gerekir. `NEXT_PUBLIC_` değişkenleri tarayıcıya açık olacağından bunlara gizli anahtar koymayın.
-4. Supabase projesinde sırasıyla `schema.sql`, `schema_v2_image_usage.sql`, `schema_v3_visual_storage.sql`, `schema_v4_media_library.sql`, `schema_v5_workspace_and_manual_publishing.sql` ve `schema_v6_atomic_profile_and_media_integrity.sql` dosyalarını SQL Editor üzerinden çalıştırın.
+4. Supabase projesinde sırasıyla `schema.sql`, `schema_v2_image_usage.sql`, `schema_v3_visual_storage.sql`, `schema_v4_media_library.sql`, `schema_v5_workspace_and_manual_publishing.sql` `schema_v6_atomic_profile_and_media_integrity.sql` ve `schema_v7_hardening_and_account.sql` dosyalarını SQL Editor üzerinden çalıştırın.
 5. Geliştirme sunucusunu başlatın:
 
    ```bash
@@ -64,6 +64,7 @@ Supabase başlangıç SQL'leri:
 4. `schema_v4_media_library.sql` (medya türü alanı, genişletilmiş MIME/50 MB limitli özel bucket)
 5. `schema_v5_workspace_and_manual_publishing.sql` (manuel yayın günlüğü/hedef hesap, atomik sosyal hesap eşitleme ve üretim kotası, telafi edilebilir Storage temizliği)
 6. `schema_v6_atomic_profile_and_media_integrity.sql` (profil+sosyal hesapların tek transaction'da kaydı ve içerik business_id değişmezliği)
+7. `schema_v7_hardening_and_account.sql` (anon yetkilerinin kaldırılması, kullanıcı başına 10 marka sınırı, hesap silme RPC'si `delete_my_account`, alan uzunluk sınırları). Hesabım sayfasındaki "Hesabı sil" bu dosya uygulanmadan çalışmaz.
 
 Şema değişikliklerini canlı veritabanına uygulamadan önce yedek alın ve staging ortamında deneyin. İki farklı kullanıcıyla RLS izolasyonunu doğrulamadan canlıya çıkmayın.
 
@@ -106,6 +107,7 @@ Bu sürümde bilinçli olarak kapsam dışında kalan veya canlıya çıkmadan �
 - `schema_v4_media_library.sql`: medya türleri ve fotoğraf/video/model depolaması
 - `schema_v5_workspace_and_manual_publishing.sql`: aktif marka akışına uygun RPC'ler, manuel yayın günlüğü, atomik kota ve telafi edilebilir medya temizliği
 - `schema_v6_atomic_profile_and_media_integrity.sql`: atomik profil+hesap kaydı ve içerik marka kimliği bütünlüğü
+- `schema_v7_hardening_and_account.sql`: güvenlik sertleştirmesi ve hesap silme
 - `src/lib/*.test.ts`, `vitest.config.mts`: marka paleti, PNG doğrulama, GLB ve güvenli paylaşım URL birim testleri
 - `.env.example`: beklenen ortam değişkenleri için örnek
 - `docs/platform-entegrasyon-plani.md`: platform API koşulları ve otomatik yayına geçiş planı

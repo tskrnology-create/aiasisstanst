@@ -18,6 +18,7 @@ import {
   snippet,
   weekStrip,
 } from "@/lib/dashboard-utils";
+import { upcomingSpecialDays } from "@/lib/special-days";
 import { useBusinessContext } from "./BusinessContext";
 import { Button, Callout, EmptyState, LinkButton, PlatformBadge, SectionCard, StatusPill, Tag, cx } from "./Ui";
 import {
@@ -285,6 +286,7 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
     plannedCount: data.planned,
   });
   const sevenDay = data.upcoming.filter((i) => new Date(i.scheduled_at).getTime() >= now.getTime()).length;
+  const specialDays = upcomingSpecialDays(now, 45, 3);
   const initial = business.name.trim().charAt(0).toUpperCase() || "A";
 
   return (
@@ -485,6 +487,29 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
                         <span className={cx("block text-sm font-medium text-ink", step.done && "line-through")}>{step.label}</span>
                         {!step.done && <span className="block text-xs text-muted">{step.hint}</span>}
                       </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
+          )}
+
+          {specialDays.length > 0 && (
+            <SectionCard title="Yaklaşan özel günler" description="Fırsatı kaçırmadan içerik hazırla.">
+              <ul className="divide-y divide-line">
+                {specialDays.map((day) => (
+                  <li key={day.name}>
+                    <Link
+                      href={`/uret?prompt=${encodeURIComponent(day.prompt)}`}
+                      className="flex items-center justify-between gap-3 py-2.5 transition hover:opacity-80"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-ink">{day.name}</span>
+                        <span className="block text-xs text-muted">
+                          {day.daysAway === 0 ? "Bugün" : day.daysAway === 1 ? "Yarın" : `${day.daysAway} gün sonra`}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-xs font-semibold text-brand dark:text-brand-strong">Üret →</span>
                     </Link>
                   </li>
                 ))}

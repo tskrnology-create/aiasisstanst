@@ -32,7 +32,12 @@ export async function authenticateRequest(request: Request): Promise<AuthResult>
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data, error } = await supabase.auth.getUser(token);
+  const { data, error } = await Promise.race([
+    supabase.auth.getUser(token),
+    new Promise<{ data: { user: null }; error: Error }>((resolve) =>
+      setTimeout(() => resolve({ data: { user: null }, error: new Error("timeout") }), 10_000)
+    ),
+  ]);
   if (error || !data.user) {
     return { ok: false, response: json({ error: "Oturum geçersiz, tekrar giriş yapın." }, 401) };
   }

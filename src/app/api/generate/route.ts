@@ -8,6 +8,7 @@ import {
   type BusinessProfile,
 } from "@/lib/brand-prompt";
 import { isTone } from "@/lib/tones";
+import { isContentKind, isPlatformId } from "@/lib/content-kinds";
 import { generateJson, getProvider } from "@/lib/llm";
 
 export const maxDuration = 60;
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     return json({ error: "Yapay zekâ servisi şu an kullanılamıyor. Lütfen daha sonra tekrar deneyin." }, 503);
   }
 
-  let body: { prompt?: unknown; tone?: unknown; parentId?: unknown; businessId?: unknown };
+  let body: { prompt?: unknown; tone?: unknown; parentId?: unknown; businessId?: unknown; kind?: unknown; platform?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -48,6 +49,10 @@ export async function POST(request: Request) {
     if (!isTone(body.tone)) return json({ error: "Geçersiz ton." }, 400);
     tone = body.tone;
   }
+  const kind = body.kind === undefined || body.kind === null || body.kind === "" ? undefined : body.kind;
+  if (kind !== undefined && !isContentKind(kind)) return json({ error: "Geçersiz içerik türü." }, 400);
+  const platform = body.platform === undefined || body.platform === null || body.platform === "" ? undefined : body.platform;
+  if (platform !== undefined && !isPlatformId(platform)) return json({ error: "Geçersiz platform." }, 400);
   const parentId = body.parentId === undefined || body.parentId === null || body.parentId === ""
     ? null
     : isUuid(body.parentId) ? body.parentId : null;
@@ -58,6 +63,18 @@ export async function POST(request: Request) {
   const { business, error: businessError } = await getBusinessById(supabase, body.businessId);
   if (businessError) return json({ error: "Seçili marka profili okunamadı." }, 500);
   if (!business) return json({ error: "Seçili marka bulunamadı veya bu hesaba ait değil." }, 404);
+
+  if (parentId) {
+    // Üst içerik, ücretli model çağrısından ÖNCE doğrulanır; geçersizse kota harcanmaz/iade edilmez.
+    const { data: parent, error: parentError } = await supabase
+      .from("contents")
+      .select("id")
+      .eq("id", parentId)
+      .eq("business_id", business.id)
+      .maybeSingle();
+    if (parentError) return json({ error: "Üst içerik okunamadı." }, 500);
+    if (!parent) return json({ error: "Üst içerik bulunamadı." }, 404);
+  }
 
   const { data: reservationId, error: reserveError } = await supabase.rpc("reserve_generation", {
     p_business_id: business.id,
@@ -82,8 +99,10 @@ export async function POST(request: Request) {
       brand_colors: business.brand_colors ?? [],
       content_language: business.content_language,
     };
-    const result = await generateJson(buildGenerateMessages(profile, { userPrompt: prompt, tone }));
+    const result = await generateJson(buildGenerateMessages(profile, { userPrompt: prompt, tone, kind, platform }));
     if (!result.ok) return json({ error: publicTextError(result.message) }, 502);
+    // Model yanıtı alındıktan sonra maliyet oluştu; kayıt başarısız olsa bile kota iade edilmez.
+    saved = true;
 
     let generated;
     try {

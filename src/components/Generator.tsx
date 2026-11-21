@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { TONES, type Tone } from "@/lib/tones";
+import { CONTENT_KINDS, PLATFORMS, type ContentKind, type PlatformId } from "@/lib/content-kinds";
+import { postApi } from "@/lib/api-client";
+import type { ContentIdea } from "@/lib/brand-prompt";
 import { MANUAL_SHARE_NOTE } from "@/lib/share-links";
 import {
   Callout,
@@ -146,6 +149,10 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
     return q ? q.slice(0, MAX_PROMPT_LEN) : "";
   });
   const [tone, setTone] = useState<Tone | "">("");
+  const [kind, setKind] = useState<ContentKind | "">("");
+  const [platform, setPlatform] = useState<PlatformId | "">("");
+  const [ideas, setIdeas] = useState<ContentIdea[] | null>(null);
+  const [ideasBusy, setIdeasBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
@@ -174,6 +181,8 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
           businessId,
           tone: opts.tone || undefined,
           parentId: opts.parentId,
+          kind: kind || undefined,
+          platform: platform || undefined,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -191,6 +200,26 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function loadIdeas() {
+    if (!businessId || ideasBusy) return;
+    setIdeasBusy(true);
+    setError(null);
+    try {
+      const res = await postApi<{ ideas: ContentIdea[] }>("/api/ideas", { businessId });
+      setIdeas(res.ideas);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fikirler alınamadı.");
+    } finally {
+      setIdeasBusy(false);
+    }
+  }
+
+  function pickIdea(idea: ContentIdea) {
+    setPrompt(idea.prompt.slice(0, MAX_PROMPT_LEN));
+    if (idea.kind) setKind(idea.kind);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -236,6 +265,34 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
           </div>
 
           <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">İçerik türü</p>
+            <div className="flex flex-wrap gap-1.5">
+              <Chip active={kind === ""} onClick={() => setKind("")}>
+                Serbest
+              </Chip>
+              {CONTENT_KINDS.map((k) => (
+                <Chip key={k.id} active={kind === k.id} onClick={() => setKind(k.id)}>
+                  {k.label}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">Platform</p>
+            <div className="flex flex-wrap gap-1.5">
+              <Chip active={platform === ""} onClick={() => setPlatform("")}>
+                Genel
+              </Chip>
+              {PLATFORMS.map((p) => (
+                <Chip key={p.id} active={platform === p.id} onClick={() => setPlatform(p.id)}>
+                  {p.label}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">Ton</p>
             <div className="flex flex-wrap gap-1.5">
               <Chip active={tone === ""} onClick={() => setTone("")}>
@@ -270,7 +327,42 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
           </div>
         </form>
 
-        {!main && <div className="mt-5 border-t border-line pt-5"><PromptIdeas onPick={setPrompt} /></div>}
+        {!main && (
+          <div className="mt-5 space-y-4 border-t border-line pt-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-ink">Ne paylaşacağını bilmiyor musun?</p>
+                <p className={hintClass}>Markana ve yaklaşan özel günlere göre fikirler önerelim.</p>
+              </div>
+              <button
+                type="button"
+                onClick={loadIdeas}
+                disabled={ideasBusy || !businessId}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-surface px-4 text-sm font-medium text-ink transition hover:border-brand hover:bg-brand-soft disabled:opacity-60"
+              >
+                <IconSparkles className="h-4 w-4 text-brand dark:text-brand-strong" />
+                {ideasBusy ? "Fikirler hazırlanıyor…" : ideas ? "Yeni fikirler getir" : "Fikir öner"}
+              </button>
+            </div>
+            {ideas && (
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {ideas.map((idea) => (
+                  <li key={idea.title + idea.prompt}>
+                    <button
+                      type="button"
+                      onClick={() => pickIdea(idea)}
+                      className="flex h-full w-full flex-col items-start gap-1 rounded-xl border border-line bg-surface p-3.5 text-left transition hover:border-brand hover:bg-brand-soft"
+                    >
+                      <span className="text-sm font-semibold text-ink">{idea.title}</span>
+                      <span className="text-xs leading-relaxed text-muted">{idea.prompt}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {!ideas && <PromptIdeas onPick={setPrompt} />}
+          </div>
+        )}
       </SectionCard>
 
       {main && (

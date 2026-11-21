@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   }
   if (!isImageStyle(body.style)) return json({ error: "Geçersiz stil." }, 400);
   const formatId = (typeof body.format === "string" ? body.format : "post") as FormatId;
-  const format = FORMATS[formatId];
+  const format = Object.hasOwn(FORMATS, formatId) ? FORMATS[formatId] : undefined;
   if (!format) return json({ error: "Geçersiz format." }, 400);
 
   const { supabase } = auth;

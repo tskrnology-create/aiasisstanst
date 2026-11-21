@@ -4,6 +4,7 @@
 // sadece mesajlar hazırlanır (test etmesi kolay olsun diye).
 
 import { paletteRuleTr, paletteSummaryTr, readPalette } from "./brand-palette";
+import { CONTENT_KINDS, PLATFORMS, type ContentKind, type PlatformId } from "./content-kinds";
 
 export type ContentLanguage = "tr" | "en";
 
@@ -21,6 +22,8 @@ export interface BusinessProfile {
 export interface GenerateRequest {
   userPrompt: string;     // "Kasım ayına özel indirim kampanyası oluştur"
   tone?: string;          // alternatif ton istenirse: "esprili", "resmi" ...
+  kind?: ContentKind;     // içerik türü: kampanya, duyuru ...
+  platform?: PlatformId;  // hedef platform: karakter/hashtag kuralları değişir
 }
 
 export interface ChatMessage {
@@ -70,8 +73,13 @@ export function buildGenerateMessages(
     ? `Bu sefer ton: ${clean(req.tone)}.`
     : `Ton: marka diline uygun.`;
 
+  const kind = CONTENT_KINDS.find((k) => k.id === req.kind);
+  const platform = PLATFORMS.find((p) => p.id === req.platform);
+
   const user = [
     `İstek: ${clean(req.userPrompt)}`,
+    kind ? `İçerik türü: ${kind.label}. ${kind.guide}` : ``,
+    platform ? platform.guide : ``,
     toneLine,
     ``,
     `Şu alanları içeren bir JSON nesnesi üret:`,
@@ -82,12 +90,67 @@ export function buildGenerateMessages(
     `  "ad_text": "reklam metni",`,
     `  "story_text": "hikâye metni (kısa)"`,
     `}`,
-  ].join("\n");
+  ]
+    .filter((line, i, all) => line !== "" || all[i - 1] !== "")
+    .join("\n");
 
   return [
     { role: "system", content: buildBrandSystemPrompt(profile) },
     { role: "user", content: user },
   ];
+}
+
+// --- İçerik fikri üretimi: "Bugün ne paylaşsam?" sorusuna cevap. ---
+
+export interface ContentIdea {
+  title: string;
+  prompt: string;
+  kind: ContentKind | null;
+}
+
+export function buildIdeasMessages(
+  profile: BusinessProfile,
+  opts: { count: number; upcoming: string[]; focus?: string }
+): ChatMessage[] {
+  const user = [
+    `Bu işletme için önümüzdeki 2 hafta içinde paylaşılabilecek ${opts.count} FARKLI sosyal medya içerik fikri öner.`,
+    `Fikirler çeşitli olsun (kampanya, ipucu, tanıtım, güven, perde arkası gibi) ve profildeki gerçek ürün/hizmetlere dayansın.`,
+    opts.upcoming.length ? `Yaklaşan özel günler (uygunsa değerlendir): ${opts.upcoming.map(clean).join(", ")}.` : ``,
+    opts.focus ? `Odak: ${clean(opts.focus)}` : ``,
+    ``,
+    `Yalnızca şu JSON biçiminde yanıt ver:`,
+    `{ "ideas": [ { "title": "kısa başlık (en fazla 60 karakter)", "prompt": "içerik üretici için 1-2 cümlelik net brief", "kind": "${CONTENT_KINDS.map((k) => k.id).join("|")}" } ] }`,
+  ]
+    .filter((line, i, all) => line !== "" || all[i - 1] !== "")
+    .join("\n");
+  return [
+    { role: "system", content: buildBrandSystemPrompt(profile) },
+    { role: "user", content: user },
+  ];
+}
+
+export function parseIdeas(raw: string, max = 10): ContentIdea[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error("Model geçerli JSON döndürmedi");
+  }
+  const list = (data as { ideas?: unknown })?.ideas;
+  if (!Array.isArray(list)) throw new Error("Fikir listesi yok");
+  const ideas: ContentIdea[] = [];
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const title = typeof o.title === "string" ? o.title.replace(/\s+/g, " ").trim().slice(0, 80) : "";
+    const prompt = typeof o.prompt === "string" ? o.prompt.replace(/\s+/g, " ").trim().slice(0, 450) : "";
+    if (!title || prompt.length < 3) continue;
+    const kind = CONTENT_KINDS.some((k) => k.id === o.kind) ? (o.kind as ContentKind) : null;
+    ideas.push({ title, prompt, kind });
+    if (ideas.length >= max) break;
+  }
+  if (ideas.length === 0) throw new Error("Geçerli fikir yok");
+  return ideas;
 }
 
 // Model çıktısını doğrula: bozuk JSON'u veritabanına yazmayalım.

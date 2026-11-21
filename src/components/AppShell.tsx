@@ -113,8 +113,8 @@ function AccountBlock({ vertical }: { vertical: boolean }) {
         {initials}
       </span>
       <div className={cx("min-w-0", vertical && "flex-1")}>
-        <p className="truncate text-xs font-medium text-ink">{label}</p>
-        <p className="text-[11px] text-muted">Hesap</p>
+        <Link href="/hesap" className="block truncate text-xs font-medium text-ink hover:underline">{label}</Link>
+        <Link href="/hesap" className="text-[11px] text-muted hover:text-ink">Hesabım</Link>
       </div>
       <button
         type="button"
@@ -357,6 +357,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </p>
           )}
           <div key={pathname} className="animate-rise">{children}</div>
+          <footer className="mt-10 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11px] text-faint">
+            <Link href="/gizlilik" className="hover:text-ink">Gizlilik</Link>
+            <Link href="/kosullar" className="hover:text-ink">Koşullar</Link>
+            <Link href="/hesap" className="hover:text-ink">Hesabım</Link>
+          </footer>
         </main>
       </div>
 
