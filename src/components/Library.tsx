@@ -37,6 +37,7 @@ import {
   IconSearch,
   IconTrash,
 } from "./Icons";
+import { studioHref } from "@/lib/routes";
 
 const PAGE_LIMIT = 200;
 
@@ -314,7 +315,13 @@ function ItemCard({
             <Button type="button" size="sm" variant="ghost" onClick={() => downloadText(currentRow)}>
               <IconDownload />İndir (.txt)
             </Button>
-            <LinkButton href={`/uret?prompt=${encodeURIComponent(row.prompt)}`} size="sm" variant="ghost">
+            <LinkButton href={studioHref({ step: "gorsel", contentId: row.id })} size="sm" variant="soft">
+              Görsel hazırla
+            </LinkButton>
+            <LinkButton href={studioHref({ step: "planla", contentId: row.id })} size="sm" variant="soft">
+              Planla
+            </LinkButton>
+            <LinkButton href={studioHref({ prompt: row.prompt })} size="sm" variant="ghost">
               <IconRefresh />Yeniden kullan
             </LinkButton>
             <button
@@ -443,7 +450,7 @@ function LibraryWorkspace({
         title="Arşiviniz"
         description={`${rows.length} içerik · ${visible.length} gösteriliyor`}
         aside={
-          <LinkButton href="/uret" size="sm" variant="soft">
+          <LinkButton href={studioHref()} size="sm" variant="soft">
             Yeni içerik üret
           </LinkButton>
         }
@@ -489,7 +496,7 @@ function LibraryWorkspace({
           title="Henüz kayıtlı içeriğiniz yok"
           description="İlk içeriğinizi üretin; taslak olarak kütüphaneye otomatik kaydedilir."
           action={
-            <LinkButton href="/uret" variant="primary" size="sm">
+            <LinkButton href={studioHref()} variant="primary" size="sm">
               İlk içeriğinizi üretin
             </LinkButton>
           }

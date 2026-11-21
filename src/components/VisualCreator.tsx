@@ -28,6 +28,7 @@ import { IconDownload, IconImage, IconLibrary, IconRefresh, IconSparkles, IconWa
 import TemplateGallery from "./visual/TemplateGallery";
 import MediaPicker from "./MediaPicker";
 import { useBusinessContext } from "./BusinessContext";
+import { studioHref } from "@/lib/routes";
 
 type TextSource = "post_text" | "ad_text" | "story_text" | "caption";
 type Style = "photo" | "illustration" | "abstract";
@@ -127,7 +128,17 @@ function VisualCreatorWorkspace({
         if (!active) return;
         setBiz(b);
         if (c.error) setLoadError("İçerikler yüklenemedi: " + c.error.message);
-        else setContents((c.data ?? []) as ContentRow[]);
+        else {
+          const rows = (c.data ?? []) as ContentRow[];
+          setContents(rows);
+          // Stüdyo akışından gelindiyse çalışılan içerik hazır seçili olur.
+          const wanted = new URLSearchParams(window.location.search).get("content");
+          const hit = wanted ? rows.find((r) => r.id === wanted) : undefined;
+          if (hit) {
+            setContentId(hit.id);
+            setHeadline(toHeadline(hit.post_text));
+          }
+        }
       })
       .catch((err: Error) => { if (active) setLoadError("Yüklenemedi: " + err.message); })
       .finally(() => { if (active) setProfileLoaded(true); });
@@ -413,7 +424,7 @@ function VisualCreatorWorkspace({
       <section className="rounded-2xl border border-line bg-surface/90 p-5 shadow-soft backdrop-blur-sm sm:p-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Segmented value={tab} onChange={setTab} options={TABS} ariaLabel="Düzenleme adımı" />
-          <LinkButton href="/uret" size="sm" variant="ghost">
+          <LinkButton href={studioHref()} size="sm" variant="ghost">
             <IconSparkles className="h-3.5 w-3.5" />Yeni içerik
           </LinkButton>
         </div>
@@ -423,7 +434,7 @@ function VisualCreatorWorkspace({
             {contents.length === 0 ? (
               <Callout tone="info">
                 Henüz içeriğiniz yok.{" "}
-                <Link href="/uret" className="font-semibold underline underline-offset-2">
+                <Link href={studioHref()} className="font-semibold underline underline-offset-2">
                   Önce içerik üretin →
                 </Link>{" "}
                 Dilerseniz yazıyı aşağıya kendiniz de girebilirsiniz.

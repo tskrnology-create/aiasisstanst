@@ -53,6 +53,7 @@ import {
   IconRefresh,
   IconTrash,
 } from "./Icons";
+import { studioHref } from "@/lib/routes";
 
 const SELECT_ITEM = "*, contents(prompt, tone, post_text, caption, hashtags, status)";
 const WEEKDAYS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
@@ -231,7 +232,7 @@ function ItemRow({
         </Button>
         {c && (
           <Link
-            href={`/uret?prompt=${encodeURIComponent(c.prompt)}`}
+            href={studioHref({ prompt: c.prompt })}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted transition hover:bg-surface-2 hover:text-ink"
           >
             <IconExternal className="h-3.5 w-3.5" />
@@ -338,7 +339,9 @@ function AddForm({
   accounts: CalendarSocialAccount[];
   onAdded: () => void;
 }) {
-  const [contentId, setContentId] = useState("");
+  const [contentId, setContentId] = useState(() =>
+    typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("content") ?? "")
+  );
   const [platform, setPlatform] = useState<SocialPlatform>("instagram");
   const [socialAccountId, setSocialAccountId] = useState("");
   const [time, setTime] = useState("10:00");
@@ -380,7 +383,7 @@ function AddForm({
     return (
       <Callout tone="warning">
         Takvime eklenecek içerik yok.{" "}
-        <Link href="/uret" className="font-semibold underline underline-offset-2">
+        <Link href={studioHref()} className="font-semibold underline underline-offset-2">
           Önce içerik üretin →
         </Link>
       </Callout>

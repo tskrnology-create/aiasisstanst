@@ -14,6 +14,7 @@ import {
   formatWhen,
   greeting,
   isProfileComplete,
+  nextAction,
   longDate,
   snippet,
   weekStrip,
@@ -32,6 +33,7 @@ import {
   IconRefresh,
   IconSparkles,
 } from "./Icons";
+import { contentsHref, studioHref } from "@/lib/routes";
 
 interface UpcomingItem {
   id: string;
@@ -286,6 +288,13 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
     plannedCount: data.planned,
   });
   const sevenDay = data.upcoming.filter((i) => new Date(i.scheduled_at).getTime() >= now.getTime()).length;
+  const next = nextAction({
+    overdue: data.overdue,
+    total: data.total,
+    drafts: data.drafts,
+    approved: data.approved,
+    upcoming7: sevenDay,
+  });
   const specialDays = upcomingSpecialDays(now, 45, 3);
   const initial = business.name.trim().charAt(0).toUpperCase() || "A";
 
@@ -328,13 +337,10 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <LinkButton href="/uret" variant="primary">
-              <IconSparkles /> İçerik üret
+            <LinkButton href={studioHref()} variant="primary">
+              <IconSparkles /> Stüdyo
             </LinkButton>
-            <LinkButton href="/gorsel" variant="secondary">
-              <IconImage /> Görsel oluştur
-            </LinkButton>
-            <LinkButton href="/takvim" variant="ghost">
+            <LinkButton href={contentsHref({ view: "takvim" })} variant="ghost">
               <IconCalendar /> Takvim
             </LinkButton>
           </div>
@@ -343,21 +349,26 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
 
       {error && <Callout tone="warning">{error}</Callout>}
 
-      {data.overdue > 0 && (
-        <Callout tone="warning">
-          <p>
-            <strong>{data.overdue} paylaşım</strong> zamanı geçti ve henüz “paylaşıldı” işaretlenmedi.{" "}
-            <Link href="/takvim" className="font-semibold underline underline-offset-2">
-              Takvime git →
-            </Link>
-          </p>
-        </Callout>
-      )}
+      <section
+        className={cx(
+          "flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4 sm:p-5",
+          next.tone === "warn" ? "border-warn/40 bg-warn-soft" : "border-brand/30 bg-brand-soft"
+        )}
+      >
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Sıradaki adım</p>
+          <h3 className="text-base font-semibold text-ink">{next.title}</h3>
+          <p className="mt-0.5 text-sm text-ink-soft">{next.description}</p>
+        </div>
+        <LinkButton href={next.href} variant="primary">
+          {next.cta} →
+        </LinkButton>
+      </section>
 
       {/* Sayılar */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
-          href="/kutuphane"
+          href={contentsHref()}
           label="Toplam içerik"
           value={data.total}
           note={`Bu ay ${data.thisMonth} yeni`}
@@ -365,7 +376,7 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
           tone="brand"
         />
         <StatCard
-          href="/kutuphane"
+          href={contentsHref()}
           label={STATUS_LABEL.draft}
           value={data.drafts}
           note="Onay bekliyor"
@@ -373,7 +384,7 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
           tone="warn"
         />
         <StatCard
-          href="/kutuphane"
+          href={contentsHref()}
           label={STATUS_LABEL.approved}
           value={data.approved}
           note="Paylaşıma hazır"
@@ -381,7 +392,7 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
           tone="ok"
         />
         <StatCard
-          href="/takvim"
+          href={contentsHref({ view: "takvim" })}
           label="Önümüzdeki 7 gün"
           value={sevenDay}
           note={`Bu ay ${data.postedThisMonth} paylaşıldı`}
@@ -396,7 +407,7 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
           title="Yaklaşan paylaşımlar"
           description="Zamanı gelen veya geçmiş, henüz paylaşılmamış içerikler."
           aside={
-            <LinkButton href="/takvim" variant="ghost" size="sm">
+            <LinkButton href={contentsHref({ view: "takvim" })} variant="ghost" size="sm">
               Tümü
             </LinkButton>
           }
@@ -423,7 +434,7 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
               title="Planlı paylaşım yok"
               description="Bir içeriği takvime ekleyerek ne zaman paylaşacağını planla."
               action={
-                <LinkButton href="/takvim" variant="soft" size="sm">
+                <LinkButton href={contentsHref({ view: "takvim" })} variant="soft" size="sm">
                   Takvimi aç
                 </LinkButton>
               }
@@ -435,7 +446,7 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
                 const late = new Date(item.scheduled_at).getTime() < now.getTime();
                 return (
                   <li key={item.id}>
-                    <Link href="/takvim" className="flex items-center gap-3 py-3 transition hover:opacity-80">
+                    <Link href={contentsHref({ view: "takvim" })} className="flex items-center gap-3 py-3 transition hover:opacity-80">
                       {target ? (
                         <PlatformBadge initials={target.initials} color={target.color} label={target.label} className="h-8 w-8 rounded-xl text-xs" />
                       ) : (
@@ -500,7 +511,7 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
                 {specialDays.map((day) => (
                   <li key={day.name}>
                     <Link
-                      href={`/uret?prompt=${encodeURIComponent(day.prompt)}`}
+                      href={studioHref({ prompt: day.prompt })}
                       className="flex items-center justify-between gap-3 py-2.5 transition hover:opacity-80"
                     >
                       <span className="min-w-0">
@@ -557,7 +568,7 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
       <SectionCard
         title="Son içerikler"
         aside={
-          <LinkButton href="/kutuphane" variant="ghost" size="sm">
+          <LinkButton href={contentsHref()} variant="ghost" size="sm">
             Kütüphane
           </LinkButton>
         }
@@ -568,7 +579,7 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
             title="Henüz içerik yok"
             description="İlk içeriğini üret; marka profiline göre gönderi, açıklama, hashtag ve reklam metni hazırlanır."
             action={
-              <LinkButton href="/uret" variant="primary" size="sm">
+              <LinkButton href={studioHref()} variant="primary" size="sm">
                 İçerik üret
               </LinkButton>
             }
@@ -578,7 +589,7 @@ function DashboardWorkspace({ businessId }: { businessId: string }) {
             {data.recent.map((c) => (
               <li key={c.id}>
                 <Link
-                  href="/kutuphane"
+                  href={contentsHref()}
                   className="flex h-full flex-col gap-2 rounded-xl border border-line bg-surface p-3.5 transition hover:border-line-strong hover:bg-surface-2"
                 >
                   <span className="flex items-center justify-between gap-2">

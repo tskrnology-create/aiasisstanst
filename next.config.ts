@@ -9,6 +9,16 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Eski adresler (yer imleri, paylaşılmış bağlantılar) yeni yapıya yönlenir; sorgu parametreleri korunur.
+  async redirects() {
+    return [
+      { source: "/uret", destination: "/studyo", permanent: true },
+      { source: "/gorsel", destination: "/studyo?adim=gorsel", permanent: true },
+      { source: "/takvim", destination: "/icerikler?gorunum=takvim", permanent: true },
+      { source: "/kutuphane", destination: "/icerikler", permanent: true },
+      { source: "/profil", destination: "/marka", permanent: true },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

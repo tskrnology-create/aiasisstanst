@@ -12,8 +12,6 @@ import { BusinessContextProvider, useBusinessContext, type BusinessOption } from
 import { cx, selectClass } from "./Ui";
 import {
   IconBuilding,
-  IconCalendar,
-  IconImage,
   IconLayers,
   IconLibrary,
   IconLogout,
@@ -23,12 +21,10 @@ import {
 } from "./Icons";
 
 const NAV = [
-  { href: "/", label: "İşletme paneli", short: "Panel", icon: IconLayers, description: "Günlük iş özeti" },
-  { href: "/marka", label: "Marka ve hesaplar", short: "Marka", icon: IconBuilding, description: "Marka profili ve sosyal hesaplar" },
-  { href: "/uret", label: "İçerik üret", short: "Üret", icon: IconSparkles, description: "Yapay zekâ metinleri" },
-  { href: "/gorsel", label: "Görsel", short: "Görsel", icon: IconImage, description: "Tasarım stüdyosu" },
-  { href: "/takvim", label: "Takvim", short: "Takvim", icon: IconCalendar, description: "Paylaşım planı" },
-  { href: "/kutuphane", label: "Kütüphane", short: "Kütüphane", icon: IconLibrary, description: "Tüm içerikler" },
+  { href: "/", label: "Bugün", short: "Bugün", icon: IconLayers, description: "Sıradaki işler" },
+  { href: "/studyo", label: "Stüdyo", short: "Stüdyo", icon: IconSparkles, description: "Yaz, görsel hazırla, planla" },
+  { href: "/icerikler", label: "İçerikler", short: "İçerikler", icon: IconLibrary, description: "Liste ve takvim" },
+  { href: "/marka", label: "Marka", short: "Marka", icon: IconBuilding, description: "Profil ve sosyal hesaplar" },
 ] as const;
 
 const THEME_KEY = "ai-asisst-theme";

@@ -21,6 +21,7 @@ import {
 import { CopyButton } from "./ShareControls";
 import { IconCalendar, IconImage, IconLayers, IconSparkles, IconWand } from "./Icons";
 import { useBusinessContext } from "./BusinessContext";
+import { contentsHref, studioHref } from "@/lib/routes";
 
 interface GeneratedRow {
   id: string;
@@ -117,16 +118,16 @@ function ResultCard({ row, headline }: { row: GeneratedRow; headline?: string })
           )}
           <div className="flex flex-wrap items-center gap-2">
             <CopyButton text={value} label={`${block.label} metnini kopyala`} />
-            <LinkButton href={`/kutuphane?content=${encodeURIComponent(row.id)}`} variant="secondary" size="sm">
+            <LinkButton href={contentsHref({ contentId: row.id })} variant="secondary" size="sm">
               İçeriği düzenle
             </LinkButton>
-            <LinkButton href="/gorsel" variant="ghost" size="sm">
+            <LinkButton href={studioHref({ step: "gorsel", contentId: row.id })} variant="primary" size="sm">
               <IconImage className="h-3.5 w-3.5" />
-              Görselini hazırla
+              Sonraki adım: Görsel
             </LinkButton>
-            <LinkButton href="/takvim" variant="ghost" size="sm">
+            <LinkButton href={studioHref({ step: "planla", contentId: row.id })} variant="ghost" size="sm">
               <IconCalendar className="h-3.5 w-3.5" />
-              Takvime planla
+              Doğrudan planla
             </LinkButton>
           </div>
         </div>
@@ -319,7 +320,7 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
               {busy ? "Üretiliyor…" : "İçerik üret"}
             </button>
             {main && (
-              <LinkButton href="/kutuphane" variant="ghost" size="md">
+              <LinkButton href={contentsHref()} variant="ghost" size="md">
                 <IconLayers className="h-4 w-4" />
                 Kütüphanede gör
               </LinkButton>

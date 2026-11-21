@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildChecklist, greeting, isProfileComplete, snippet, weekStrip } from "./dashboard-utils";
+import { buildChecklist, greeting, isProfileComplete, nextAction, snippet, weekStrip } from "./dashboard-utils";
 
 describe("dashboard-utils", () => {
   it("greets by time of day", () => {
@@ -26,5 +26,15 @@ describe("dashboard-utils", () => {
   it("detects incomplete profile and trims snippets", () => {
     expect(isProfileComplete({ industry: "", products: "", target_audience: "", brand_voice: "" })).toBe(false);
     expect(snippet("a".repeat(300), 50).length).toBeLessThanOrEqual(51);
+  });
+
+  it("nextAction öncelik sırasını uygular", () => {
+    const base = { overdue: 0, total: 5, drafts: 0, approved: 0, upcoming7: 3 };
+    expect(nextAction({ ...base, overdue: 2, total: 0 }).id).toBe("overdue");
+    expect(nextAction({ ...base, total: 0 }).id).toBe("first");
+    expect(nextAction({ ...base, drafts: 2 }).id).toBe("drafts");
+    expect(nextAction({ ...base, upcoming7: 0, approved: 1 })).toMatchObject({ id: "plan", href: "/icerikler?gorunum=takvim" });
+    expect(nextAction({ ...base, upcoming7: 0 }).href).toBe("/studyo");
+    expect(nextAction(base).id).toBe("create");
   });
 });
