@@ -8,7 +8,7 @@ export const metadata = { title: "Video" };
 export default function Page() {
   return (
     <>
-      <PageHeader eyebrow="Stüdyo" title="Video" description="Yalnızca video: senaryo, sahne listesi ve stok klipler." />
+      <PageHeader eyebrow="Stüdyo" title="Video" description="Görsel ve metinle yapay zekâ videosu, kendi videonuz ya da senaryo." />
       <AuthGate>
         <Suspense fallback={null}>
           <VideoStudio />

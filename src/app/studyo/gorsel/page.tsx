@@ -8,7 +8,7 @@ export const metadata = { title: "Görsel" };
 export default function Page() {
   return (
     <>
-      <PageHeader eyebrow="Stüdyo" title="Görsel" description="Yalnızca görsel: fotoğrafı üretin, yükleyin ya da Pixabay'dan seçin; şablona yerleştirin." />
+      <PageHeader eyebrow="Stüdyo" title="Görsel" description="Fotoğrafı üretin, yükleyin ya da Pixabay'dan seçin; şablona yerleştirin, isterseniz yazı ekleyin." />
       <AuthGate>
         <Suspense fallback={null}>
           <ImageStudio />

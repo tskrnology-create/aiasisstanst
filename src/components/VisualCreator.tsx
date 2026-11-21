@@ -10,7 +10,6 @@ import {
   FORMATS,
   DEFAULT_PHOTO_TEMPLATE,
   DEFAULT_TEMPLATE,
-  TEXT_TEMPLATES,
   PHOTO_TEMPLATES,
   TEMPLATE_USAGE,
   templateWantsPhoto,
@@ -29,13 +28,14 @@ import { Button, Callout, Chip, LinkButton, Segmented, StatusPill, Tag, cx, hint
 import { IconDownload, IconImage, IconLibrary, IconRefresh, IconSparkles, IconWand } from "./Icons";
 import TemplateGallery from "./visual/TemplateGallery";
 import MediaPicker from "./MediaPicker";
+import MusicPicker, { type MusicChoice } from "./MusicPicker";
 import { useBusinessContext } from "./BusinessContext";
-import { modeHref, studioHref } from "@/lib/routes";
+import { studioHref } from "@/lib/routes";
 
 type TextSource = "post_text" | "ad_text" | "story_text" | "caption";
 type Style = "photo" | "illustration" | "abstract";
 type Tab = "content" | "design" | "background";
-export type VisualMode = "birlikte" | "gorsel" | "metin";
+export type VisualMode = "birlikte" | "gorsel";
 type BgMode = "media" | "upload" | "ai";
 
 const SOURCE_LABEL: Record<TextSource, string> = {
@@ -60,10 +60,6 @@ const MODE_TABS: Record<VisualMode, ReadonlyArray<{ value: Tab; label: string }>
     { value: "background", label: "1 · Fotoğraf" },
     { value: "design", label: "2 · Şablon" },
     { value: "content", label: "3 · Yazı" },
-  ],
-  metin: [
-    { value: "content", label: "1 · Yazı" },
-    { value: "design", label: "2 · Şablon ve renk" },
   ],
 };
 const BG_MODES: ReadonlyArray<{ value: BgMode; label: string }> = [
@@ -114,8 +110,13 @@ function VisualCreatorWorkspace({
 
   const [contentId, setContentId] = useState("");
   const [source, setSource] = useState<TextSource>("post_text");
-  const [headline, setHeadline] = useState("");
-  const [subline, setSubline] = useState("");
+  const [headlineInput, setHeadline] = useState("");
+  const [sublineInput, setSubline] = useState("");
+  // Görsel yapısında yazı isteğe bağlıdır: kapalıyken görsel yalnızca fotoğraf ve şablondur.
+  const [withText, setWithText] = useState(mode !== "gorsel");
+  const headline = withText ? headlineInput : "";
+  const subline = withText ? sublineInput : "";
+  const [music, setMusic] = useState<MusicChoice>({ mode: "none" });
   const [format, setFormat] = useState<FormatId>("post");
   const [template, setTemplate] = useState<TemplateId>(mode === "gorsel" ? DEFAULT_PHOTO_TEMPLATE : DEFAULT_TEMPLATE);
   // Ana rengin yüzdesi 50–90 arasında tek tek ayarlanır; yardımcı renk kalandır.
@@ -124,7 +125,7 @@ function VisualCreatorWorkspace({
   const [style, setStyle] = useState<Style>("photo");
   const tabs = MODE_TABS[mode];
   const [tab, setTab] = useState<Tab>(tabs[0].value);
-  const allowedTemplates = mode === "metin" ? TEXT_TEMPLATES : mode === "gorsel" ? PHOTO_TEMPLATES : undefined;
+  const allowedTemplates = mode === "gorsel" ? PHOTO_TEMPLATES : undefined;
   const [bgMode, setBgMode] = useState<BgMode>("media");
 
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
@@ -445,10 +446,16 @@ function VisualCreatorWorkspace({
 
       {/* Düzenleme: üç adımlı sekmeler */}
       <section className="rounded-2xl border border-line bg-surface/90 p-5 shadow-soft backdrop-blur-sm sm:p-6">
+        <div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Paylaşım türü">
+          <span className="text-xs font-semibold text-muted">Paylaşım türü</span>
+          <Chip active={format === "post"} onClick={() => setFormat("post")}>Gönderi 1:1</Chip>
+          <Chip active={format === "campaign"} onClick={() => setFormat("campaign")}>Gönderi 4:5</Chip>
+          <Chip active={format === "story"} onClick={() => setFormat("story")}>Hikâye 9:16</Chip>
+        </div>
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Segmented value={tab} onChange={setTab} options={tabs} ariaLabel="Düzenleme adımı" />
           {mode !== "gorsel" && (
-            <LinkButton href={mode === "metin" ? modeHref("metin") : studioHref()} size="sm" variant="ghost">
+            <LinkButton href={studioHref()} size="sm" variant="ghost">
               <IconSparkles className="h-3.5 w-3.5" />Yeni içerik
             </LinkButton>
           )}
@@ -461,7 +468,7 @@ function VisualCreatorWorkspace({
             ) : contents.length === 0 ? (
               <Callout tone="info">
                 Henüz içeriğiniz yok.{" "}
-                <Link href={mode === "metin" ? modeHref("metin") : studioHref()} className="font-semibold underline underline-offset-2">
+                <Link href={studioHref()} className="font-semibold underline underline-offset-2">
                   Önce içerik üretin →
                 </Link>{" "}
                 Dilerseniz yazıyı aşağıya kendiniz de girebilirsiniz.
@@ -510,16 +517,23 @@ function VisualCreatorWorkspace({
                 <p className="truncate text-xs text-muted">{selected.prompt}</p>
               </div>
             )}
+            {mode === "gorsel" && (
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-2xl border border-line bg-surface-2/60 px-3.5 py-3 text-sm font-medium text-ink">
+                <input type="checkbox" checked={withText} onChange={(e) => setWithText(e.target.checked)} className="h-4 w-4 accent-brand" />
+                Görsele yazı ekle
+              </label>
+            )}
+            <fieldset disabled={!withText} className={cx("space-y-4", !withText && "opacity-50")}>
             <label className="block space-y-1.5">
               <span className="flex items-center justify-between text-sm font-medium text-ink">
                 Görseldeki yazı
-                <span className="font-mono text-[11px] text-faint">{headline.length}/{MAX_HEADLINE}</span>
+                <span className="font-mono text-[11px] text-faint">{headlineInput.length}/{MAX_HEADLINE}</span>
               </span>
               <textarea
                 className={cx(inputClass, "resize-y")}
                 rows={3}
                 maxLength={MAX_HEADLINE}
-                value={headline}
+                value={headlineInput}
                 onChange={(e) => setHeadline(e.target.value)}
                 placeholder="Örn. Kasım'a özel %20 indirim"
               />
@@ -529,11 +543,12 @@ function VisualCreatorWorkspace({
               <input
                 className={inputClass}
                 maxLength={MAX_SUBLINE}
-                value={subline}
+                value={sublineInput}
                 onChange={(e) => setSubline(e.target.value)}
                 placeholder="Örn. 30 Kasım'a kadar geçerli"
               />
             </label>
+            </fieldset>
             <div className="flex justify-end">
               {mode !== "gorsel" && <Button type="button" variant="soft" onClick={() => setTab("design")}>Tasarıma geç →</Button>}
             </div>
@@ -560,7 +575,7 @@ function VisualCreatorWorkspace({
               <p className="text-sm font-medium text-ink">Şablon</p>
               <TemplateGallery allowed={allowedTemplates} value={template} onChange={setTemplate} format={format} base={thumbBase} />
               <p className={hintClass}>{TEMPLATE_USAGE[template]}</p>
-              {mode !== "metin" && templateWantsPhoto(template) && !background && (
+              {templateWantsPhoto(template) && !background && (
                 <Callout tone="info">
                   Bu şablon fotoğrafla çok daha iyi görünür; şimdilik marka renkli yedek zemin gösteriliyor.{" "}
                   <button type="button" className="font-semibold underline" onClick={() => setTab("background")}>
@@ -697,6 +712,15 @@ function VisualCreatorWorkspace({
           </div>
         )}
       </section>
+      <div className="lg:col-span-2">
+        <MusicPicker onChange={setMusic} />
+        {music.mode !== "none" && (
+          <p className="mt-2 text-xs text-muted">
+            Müzik görsele gömülmez; hikâye veya gönderiyi paylaşırken platformun müzik seçicisinden ekleyin
+            {music.mode === "own" ? " ya da bu görseli videoya çevirirken kendi dosyanızı kullanın." : "."}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

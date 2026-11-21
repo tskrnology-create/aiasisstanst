@@ -10,9 +10,11 @@ import type { Session } from "@supabase/supabase-js";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { BusinessContextProvider, useBusinessContext, type BusinessOption } from "./BusinessContext";
 import { cx, selectClass } from "./Ui";
+import AssistantBubble from "./AssistantBubble";
 import {
   IconBuilding,
   IconCalendar,
+  IconHome,
   IconLibrary,
   IconLogout,
   IconMoon,
@@ -21,14 +23,15 @@ import {
 } from "./Icons";
 
 const NAV = [
-  { href: "/", label: "Asistan", short: "Asistan", icon: IconSparkles, description: "Yaz, fikir al, planla", match: ["/", "/studyo"] },
+  { href: "/", label: "Ana sayfa", short: "Ana", icon: IconHome, description: "Bugünün özeti", match: ["/"] },
+  { href: "/studyo", label: "Stüdyo", short: "Stüdyo", icon: IconSparkles, description: "Metin, görsel, video", match: ["/studyo"] },
   { href: "/hafta", label: "Hafta", short: "Hafta", icon: IconCalendar, description: "Bu haftanın planı", match: ["/hafta"] },
-  { href: "/icerikler", label: "İçerikler", short: "İçerikler", icon: IconLibrary, description: "Liste ve takvim", match: ["/icerikler"] },
+  { href: "/icerikler", label: "İçerikler", short: "İçerik", icon: IconLibrary, description: "Liste ve takvim", match: ["/icerikler"] },
   { href: "/marka", label: "Marka", short: "Marka", icon: IconBuilding, description: "Profil, renk, logo", match: ["/marka"] },
 ] as const;
 
 function isActive(item: (typeof NAV)[number], pathname: string): boolean {
-  return (item.match as readonly string[]).includes(pathname) || (item.href === "/" && pathname.startsWith("/studyo"));
+  return (item.match as readonly string[]).includes(pathname) || (item.href === "/studyo" && pathname.startsWith("/studyo"));
 }
 
 const THEME_KEY = "ai-asisst-theme";
@@ -392,6 +395,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </ul>
       </nav>
+      <AssistantBubble key={activeBusinessId ?? "none"} signedIn={Boolean(session?.user)} />
     </div>
     </BusinessContextProvider>
   );

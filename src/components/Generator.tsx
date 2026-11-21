@@ -83,8 +83,7 @@ function ResultCard({ row, headline, mode }: { row: GeneratedRow; headline?: str
           row={row}
           pkg={row.package}
           headline={headline}
-          nextStep={{ href: modeHref("metin", { step: "kart", contentId: row.id }), label: "Marka kartı yap" }}
-          planHref={null}
+          nextStep={null}
         />
       );
     }

@@ -26,10 +26,10 @@ export type StudioMode = "metin" | "gorsel" | "birlikte" | "video";
 export const STUDIO_HUB = "/studyo";
 
 export const STUDIO_MODES: ReadonlyArray<{ id: StudioMode; label: string; hint: string; href: string }> = [
-  { id: "metin", label: "Metin", hint: "Yazıyı üret, marka renkli şablon kartına dök", href: "/studyo/metin" },
-  { id: "gorsel", label: "Görsel", hint: "Üret, yükle ya da Pixabay'dan seç; şablona yerleştir", href: "/studyo/gorsel" },
+  { id: "metin", label: "Metin", hint: "Yalnızca yazı: yapay zekâyla yaz ya da kendi metnini ekle", href: "/studyo/metin" },
+  { id: "gorsel", label: "Görsel", hint: "Üret, yükle ya da Pixabay'dan seç; şablona koy, istersen yazı ekle", href: "/studyo/gorsel" },
   { id: "birlikte", label: "Metin + Görsel", hint: "Metin, görsel ve plan tek akışta", href: "/studyo/birlikte" },
-  { id: "video", label: "Video", hint: "Senaryo, sahne listesi ve stok klipler", href: "/studyo/video" },
+  { id: "video", label: "Video", hint: "Görsel + metinle yapay zekâ videosu, kendi videon, senaryo", href: "/studyo/video" },
 ];
 
 /** Metin / Video yapıları için: ?adim= ve ?content= taşıyan bağlantı. */

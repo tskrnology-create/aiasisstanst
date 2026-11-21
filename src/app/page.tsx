@@ -1,15 +1,12 @@
-import { Suspense } from "react";
 import AuthGate from "@/components/AuthGate";
-import Assistant from "@/components/Assistant";
+import Home from "@/components/Home";
 
-export const metadata = { title: "Asistan" };
+export const metadata = { title: "Ana sayfa" };
 
-export default function Home() {
+export default function HomePage() {
   return (
     <AuthGate>
-      <Suspense fallback={null}>
-        <Assistant />
-      </Suspense>
+      <Home />
     </AuthGate>
   );
 }

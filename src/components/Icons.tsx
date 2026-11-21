@@ -242,3 +242,39 @@ export function IconLayers(p: IconProps) {
     </Svg>
   );
 }
+
+export function IconClose(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </Svg>
+  );
+}
+
+export function IconMusic(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M9 18V6l10-2v12" />
+      <circle cx="6.5" cy="18" r="2.5" />
+      <circle cx="16.5" cy="16" r="2.5" />
+    </Svg>
+  );
+}
+
+export function IconVideo(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="3" y="6" width="13" height="12" rx="2.5" />
+      <path d="M16 10.5l5-3v9l-5-3" />
+    </Svg>
+  );
+}
+
+export function IconHome(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4 11l8-7 8 7" />
+      <path d="M6 10v10h12V10" />
+    </Svg>
+  );
+}

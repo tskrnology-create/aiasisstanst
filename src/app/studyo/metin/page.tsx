@@ -8,7 +8,7 @@ export const metadata = { title: "Metin" };
 export default function Page() {
   return (
     <>
-      <PageHeader eyebrow="Stüdyo" title="Metin" description="Yalnızca metin: yazıyı üretin, isterseniz marka renkleri ve şablonla kart yapın." />
+      <PageHeader eyebrow="Stüdyo" title="Metin" description="Yalnızca metin: yapay zekâyla yazın ya da kendi metninizi ekleyin." />
       <AuthGate>
         <Suspense fallback={null}>
           <TextStudio />
