@@ -4,7 +4,8 @@
 // sadece mesajlar hazırlanır (test etmesi kolay olsun diye).
 
 import { paletteRuleTr, paletteSummaryTr, readPalette } from "./brand-palette";
-import { CONTENT_KINDS, PLATFORMS, type ContentKind, type PlatformId } from "./content-kinds";
+import { CONTENT_KINDS, type ContentKind, type PlatformId } from "./content-kinds";
+import { PLAYBOOK, UNIVERSAL_RULES } from "./platform-playbook";
 
 export type ContentLanguage = "tr" | "en";
 
@@ -74,12 +75,13 @@ export function buildGenerateMessages(
     : `Ton: marka diline uygun.`;
 
   const kind = CONTENT_KINDS.find((k) => k.id === req.kind);
-  const platform = PLATFORMS.find((p) => p.id === req.platform);
+  const platformGuide = req.platform ? PLAYBOOK[req.platform].prompt : "";
 
   const user = [
     `İstek: ${clean(req.userPrompt)}`,
     kind ? `İçerik türü: ${kind.label}. ${kind.guide}` : ``,
-    platform ? platform.guide : ``,
+    platformGuide,
+    UNIVERSAL_RULES,
     toneLine,
     ``,
     `Şu alanları içeren bir JSON nesnesi üret:`,

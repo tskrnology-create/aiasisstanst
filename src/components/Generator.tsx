@@ -22,6 +22,8 @@ import { CopyButton } from "./ShareControls";
 import { IconCalendar, IconImage, IconLayers, IconSparkles, IconWand } from "./Icons";
 import { useBusinessContext } from "./BusinessContext";
 import { contentsHref, studioHref } from "@/lib/routes";
+import { analyzePost } from "@/lib/platform-playbook";
+import { suggestMusic } from "@/lib/music-suggestions";
 
 interface GeneratedRow {
   id: string;
@@ -79,6 +81,91 @@ function PromptIdeas({ onPick }: { onPick: (text: string) => void }) {
         ))}
       </div>
     </div>
+  );
+}
+
+interface GenMeta {
+  kind: ContentKind | "";
+  platform: PlatformId | "";
+  tone: string;
+}
+
+function PostChecklist({ row, platform }: { row: GeneratedRow; platform: PlatformId | "" }) {
+  if (!platform) {
+    return (
+      <p className="rounded-xl border border-dashed border-line-strong p-3 text-xs text-muted">
+        Platform seçerseniz (Instagram, LinkedIn…) burada o platforma göre paylaşım kontrolü görünür.
+      </p>
+    );
+  }
+  const checks = analyzePost(platform, {
+    body: row.caption || row.post_text || "",
+    hashtags: row.hashtags,
+  });
+  const warnings = checks.filter((c) => c.status === "warn").length;
+  return (
+    <SectionCard
+      title="Paylaşım kontrolü"
+      description={warnings === 0 ? "Bu platform için hazır görünüyor." : `${warnings} noktaya dikkat edin.`}
+    >
+      <ul className="space-y-2">
+        {checks.map((c) => (
+          <li key={c.id} className="flex items-start gap-2.5 text-sm">
+            <span
+              aria-hidden="true"
+              className={cx(
+                "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white",
+                c.status === "ok" ? "bg-ok" : "bg-warn"
+              )}
+            >
+              {c.status === "ok" ? "✓" : "!"}
+            </span>
+            <span>
+              <span className="font-medium text-ink">{c.label}: </span>
+              <span className="text-ink-soft">{c.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </SectionCard>
+  );
+}
+
+function MusicCard({ meta }: { meta: GenMeta }) {
+  const m = suggestMusic({ kind: meta.kind || null, tone: meta.tone, platform: meta.platform || null });
+  return (
+    <SectionCard title="Müzik önerisi" description="Video, Reels veya hikâye olarak paylaşacaksanız.">
+      <div className="space-y-3 text-sm">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Tag tone="brand">{m.mood}</Tag>
+          {m.genres.map((g) => (
+            <Tag key={g}>{g}</Tag>
+          ))}
+          <Tag>
+            {m.bpm[0]}–{m.bpm[1]} BPM
+          </Tag>
+        </div>
+        <p className="text-ink-soft">{m.tip}</p>
+        <div>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-faint">Telifsiz kitaplıkta ara</p>
+          <ul className="flex flex-wrap gap-2">
+            {m.links.map((l) => (
+              <li key={l.url}>
+                <a
+                  href={l.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink transition hover:border-brand hover:bg-brand-soft"
+                >
+                  {l.label} ↗
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <p className="rounded-xl border border-line bg-surface-2/70 p-3 text-xs text-muted">{m.licenseNote}</p>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -158,6 +245,7 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
   const [error, setError] = useState<string | null>(null);
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const [main, setMain] = useState<GeneratedRow | null>(null);
+  const [meta, setMeta] = useState<GenMeta>({ kind: "", platform: "", tone: "" });
   const [alternatives, setAlternatives] = useState<GeneratedRow[]>([]);
 
   async function generate(opts: { prompt: string; tone: Tone | ""; parentId?: string }) {
@@ -193,6 +281,7 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
         setAlternatives((a) => [row, ...a]);
       } else {
         setMain(row);
+        setMeta({ kind, platform, tone: opts.tone });
         setAlternatives([]);
         setLastPrompt(opts.prompt);
       }
@@ -369,6 +458,8 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
       {main && (
         <div className="space-y-5">
           <ResultCard row={main} />
+          <PostChecklist row={main} platform={meta.platform} />
+          <MusicCard meta={meta} />
 
           <SectionCard
             step="Alternatifler"

@@ -17,11 +17,11 @@ export function isContentKind(value: unknown): value is ContentKind {
 }
 
 export const PLATFORMS = [
-  { id: "instagram", label: "Instagram", guide: "Instagram için yaz: ilk cümle dikkat çeksin, uygun emoji ve 5-10 hashtag kullan." },
-  { id: "facebook", label: "Facebook", guide: "Facebook için yaz: biraz daha açıklayıcı, sohbet havasında; hashtag az olsun." },
-  { id: "x", label: "X", guide: "X için yaz: gönderi metni en fazla 270 karakter olsun, en çok 2 hashtag kullan." },
-  { id: "linkedin", label: "LinkedIn", guide: "LinkedIn için yaz: profesyonel ve değer odaklı; abartılı emoji kullanma, en çok 3-5 hashtag." },
-  { id: "tiktok", label: "TikTok", guide: "TikTok için yaz: kısa, güçlü bir kanca ile başla; video açıklaması kısa ve trend hashtag'li olsun." },
+  { id: "instagram", label: "Instagram" },
+  { id: "facebook", label: "Facebook" },
+  { id: "x", label: "X" },
+  { id: "linkedin", label: "LinkedIn" },
+  { id: "tiktok", label: "TikTok" },
 ] as const;
 
 export type PlatformId = (typeof PLATFORMS)[number]["id"];
