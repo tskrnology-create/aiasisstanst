@@ -71,7 +71,9 @@ export default function TemplateGallery({
   onChange,
   format,
   base,
+  allowed,
 }: {
+  allowed?: readonly TemplateId[];
   value: TemplateId;
   onChange: (id: TemplateId) => void;
   format: FormatId;
@@ -79,7 +81,7 @@ export default function TemplateGallery({
 }) {
   return (
     <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="group" aria-label="Şablonlar">
-      {TEMPLATES.map((t) => (
+      {TEMPLATES.filter((t) => !allowed || allowed.includes(t.id)).map((t) => (
         <Thumb key={t.id} id={t.id} label={t.label} format={format} base={base} active={value === t.id} onSelect={onChange} />
       ))}
     </div>

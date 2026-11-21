@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { contentsHref, isStudioStep, studioHref } from "./routes";
+import { contentsHref, isStudioStep, modeHref, studioHref } from "./routes";
 
 describe("routes", () => {
   it("stüdyo bağlantıları adım ve içerik kimliğini taşır", () => {
-    expect(studioHref()).toBe("/studyo");
-    expect(studioHref({ step: "yaz" })).toBe("/studyo");
-    expect(studioHref({ step: "gorsel", contentId: "abc" })).toBe("/studyo?adim=gorsel&content=abc");
-    expect(studioHref({ prompt: "Kasım & indirim" })).toBe("/studyo?prompt=Kas%C4%B1m+%26+indirim");
+    expect(studioHref()).toBe("/studyo/birlikte");
+    expect(studioHref({ step: "yaz" })).toBe("/studyo/birlikte");
+    expect(studioHref({ step: "gorsel", contentId: "abc" })).toBe("/studyo/birlikte?adim=gorsel&content=abc");
+    expect(studioHref({ prompt: "Kasım & indirim" })).toBe("/studyo/birlikte?prompt=Kas%C4%B1m+%26+indirim");
+  });
+
+  it("bağımsız yapı bağlantıları", () => {
+    expect(modeHref("metin")).toBe("/studyo/metin");
+    expect(modeHref("video", { step: "klip", contentId: "a" })).toBe("/studyo/video?adim=klip&content=a");
   });
 
   it("içerikler bağlantıları", () => {

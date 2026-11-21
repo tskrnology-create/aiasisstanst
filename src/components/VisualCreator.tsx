@@ -10,6 +10,8 @@ import {
   FORMATS,
   DEFAULT_PHOTO_TEMPLATE,
   DEFAULT_TEMPLATE,
+  TEXT_TEMPLATES,
+  PHOTO_TEMPLATES,
   TEMPLATE_USAGE,
   templateWantsPhoto,
   drawVisual,
@@ -28,11 +30,12 @@ import { IconDownload, IconImage, IconLibrary, IconRefresh, IconSparkles, IconWa
 import TemplateGallery from "./visual/TemplateGallery";
 import MediaPicker from "./MediaPicker";
 import { useBusinessContext } from "./BusinessContext";
-import { studioHref } from "@/lib/routes";
+import { modeHref, studioHref } from "@/lib/routes";
 
 type TextSource = "post_text" | "ad_text" | "story_text" | "caption";
 type Style = "photo" | "illustration" | "abstract";
 type Tab = "content" | "design" | "background";
+export type VisualMode = "birlikte" | "gorsel" | "metin";
 type BgMode = "media" | "upload" | "ai";
 
 const SOURCE_LABEL: Record<TextSource, string> = {
@@ -46,11 +49,23 @@ const STYLE_LABEL: Record<Style, string> = {
   illustration: "İllüstrasyon",
   abstract: "Soyut / minimal",
 };
-const TABS: ReadonlyArray<{ value: Tab; label: string }> = [
-  { value: "content", label: "1 · İçerik" },
-  { value: "design", label: "2 · Tasarım" },
-  { value: "background", label: "3 · Arka plan" },
-];
+// Her yapının kendi sekme sırası vardır: metin yazıdan, görsel fotoğraftan başlar.
+const MODE_TABS: Record<VisualMode, ReadonlyArray<{ value: Tab; label: string }>> = {
+  birlikte: [
+    { value: "content", label: "1 · İçerik" },
+    { value: "design", label: "2 · Tasarım" },
+    { value: "background", label: "3 · Arka plan" },
+  ],
+  gorsel: [
+    { value: "background", label: "1 · Fotoğraf" },
+    { value: "design", label: "2 · Şablon" },
+    { value: "content", label: "3 · Yazı" },
+  ],
+  metin: [
+    { value: "content", label: "1 · Yazı" },
+    { value: "design", label: "2 · Şablon ve renk" },
+  ],
+};
 const BG_MODES: ReadonlyArray<{ value: BgMode; label: string }> = [
   { value: "media", label: "Pixabay medya" },
   { value: "upload", label: "Yükle" },
@@ -69,10 +84,11 @@ function toHeadline(text: string | null): string {
   return source.replace(/[ \t]+/g, " ").trim().slice(0, MAX_HEADLINE);
 }
 
-export default function VisualCreator() {
+export default function VisualCreator({ mode = "birlikte" }: { mode?: VisualMode }) {
   const { activeBusinessId, isBusinessLoading } = useBusinessContext();
   return (
     <VisualCreatorWorkspace
+      mode={mode}
       key={activeBusinessId ?? "no-brand"}
       activeBusinessId={activeBusinessId}
       isBusinessLoading={isBusinessLoading}
@@ -81,9 +97,11 @@ export default function VisualCreator() {
 }
 
 function VisualCreatorWorkspace({
+  mode,
   activeBusinessId,
   isBusinessLoading,
 }: {
+  mode: VisualMode;
   activeBusinessId: string | null;
   isBusinessLoading: boolean;
 }) {
@@ -99,12 +117,14 @@ function VisualCreatorWorkspace({
   const [headline, setHeadline] = useState("");
   const [subline, setSubline] = useState("");
   const [format, setFormat] = useState<FormatId>("post");
-  const [template, setTemplate] = useState<TemplateId>(DEFAULT_TEMPLATE);
+  const [template, setTemplate] = useState<TemplateId>(mode === "gorsel" ? DEFAULT_PHOTO_TEMPLATE : DEFAULT_TEMPLATE);
   // Ana rengin yüzdesi 50–90 arasında tek tek ayarlanır; yardımcı renk kalandır.
   const [ratioId, setRatioId] = useState<RatioId>(DEFAULT_RATIO);
   const [showStorySafeArea, setShowStorySafeArea] = useState(true);
   const [style, setStyle] = useState<Style>("photo");
-  const [tab, setTab] = useState<Tab>("content");
+  const tabs = MODE_TABS[mode];
+  const [tab, setTab] = useState<Tab>(tabs[0].value);
+  const allowedTemplates = mode === "metin" ? TEXT_TEMPLATES : mode === "gorsel" ? PHOTO_TEMPLATES : undefined;
   const [bgMode, setBgMode] = useState<BgMode>("media");
 
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
@@ -426,18 +446,22 @@ function VisualCreatorWorkspace({
       {/* Düzenleme: üç adımlı sekmeler */}
       <section className="rounded-2xl border border-line bg-surface/90 p-5 shadow-soft backdrop-blur-sm sm:p-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <Segmented value={tab} onChange={setTab} options={TABS} ariaLabel="Düzenleme adımı" />
-          <LinkButton href={studioHref()} size="sm" variant="ghost">
-            <IconSparkles className="h-3.5 w-3.5" />Yeni içerik
-          </LinkButton>
+          <Segmented value={tab} onChange={setTab} options={tabs} ariaLabel="Düzenleme adımı" />
+          {mode !== "gorsel" && (
+            <LinkButton href={mode === "metin" ? modeHref("metin") : studioHref()} size="sm" variant="ghost">
+              <IconSparkles className="h-3.5 w-3.5" />Yeni içerik
+            </LinkButton>
+          )}
         </div>
 
         {tab === "content" && (
           <div className="space-y-4">
-            {contents.length === 0 ? (
+            {mode === "gorsel" ? (
+              <Callout tone="info">Bu yapıda yazıyı kendiniz girersiniz; metin üretimi gerekmez. Üretilmiş bir metni de kullanmak isterseniz «Metin + Görsel» yapısını açın.</Callout>
+            ) : contents.length === 0 ? (
               <Callout tone="info">
                 Henüz içeriğiniz yok.{" "}
-                <Link href={studioHref()} className="font-semibold underline underline-offset-2">
+                <Link href={mode === "metin" ? modeHref("metin") : studioHref()} className="font-semibold underline underline-offset-2">
                   Önce içerik üretin →
                 </Link>{" "}
                 Dilerseniz yazıyı aşağıya kendiniz de girebilirsiniz.
@@ -511,7 +535,7 @@ function VisualCreatorWorkspace({
               />
             </label>
             <div className="flex justify-end">
-              <Button type="button" variant="soft" onClick={() => setTab("design")}>Tasarıma geç →</Button>
+              {mode !== "gorsel" && <Button type="button" variant="soft" onClick={() => setTab("design")}>Tasarıma geç →</Button>}
             </div>
           </div>
         )}
@@ -534,9 +558,9 @@ function VisualCreatorWorkspace({
 
             <div className="space-y-2">
               <p className="text-sm font-medium text-ink">Şablon</p>
-              <TemplateGallery value={template} onChange={setTemplate} format={format} base={thumbBase} />
+              <TemplateGallery allowed={allowedTemplates} value={template} onChange={setTemplate} format={format} base={thumbBase} />
               <p className={hintClass}>{TEMPLATE_USAGE[template]}</p>
-              {templateWantsPhoto(template) && !background && (
+              {mode !== "metin" && templateWantsPhoto(template) && !background && (
                 <Callout tone="info">
                   Bu şablon fotoğrafla çok daha iyi görünür; şimdilik marka renkli yedek zemin gösteriliyor.{" "}
                   <button type="button" className="font-semibold underline" onClick={() => setTab("background")}>
@@ -573,7 +597,8 @@ function VisualCreatorWorkspace({
               <p className={hintClass}>Renkleri profil sayfasından değiştirebilirsiniz.</p>
             </div>
             <div className="flex justify-end">
-              <Button type="button" variant="soft" onClick={() => setTab("background")}>Arka plana geç →</Button>
+              {mode === "birlikte" && <Button type="button" variant="soft" onClick={() => setTab("background")}>Arka plana geç →</Button>}
+              {mode === "gorsel" && <Button type="button" variant="soft" onClick={() => setTab("content")}>Yazıya geç →</Button>}
             </div>
           </div>
         )}
@@ -659,6 +684,11 @@ function VisualCreatorWorkspace({
                 <p className={hintClass}>
                   AI görselleri görünmez SynthID işareti içerebilir. Saatte 10 üretim sınırı vardır.
                 </p>
+              </div>
+            )}
+            {mode === "gorsel" && (
+              <div className="flex justify-end">
+                <Button type="button" variant="soft" onClick={() => setTab("design")}>Şablona geç →</Button>
               </div>
             )}
             <p className={hintClass}>

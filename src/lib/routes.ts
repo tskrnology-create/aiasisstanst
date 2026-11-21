@@ -20,9 +20,26 @@ function withQuery(path: string, params: Record<string, string | undefined>): st
   return text ? `${path}?${text}` : path;
 }
 
-/** Stüdyo: tek bir içeriğin yazım → görsel → plan akışı. */
+/** Bağımsız üretim yapıları: her biri tek başına çalışır; "birlikte" metin + görseli tek akışta toplar. */
+export type StudioMode = "metin" | "gorsel" | "birlikte" | "video";
+
+export const STUDIO_HUB = "/studyo";
+
+export const STUDIO_MODES: ReadonlyArray<{ id: StudioMode; label: string; hint: string; href: string }> = [
+  { id: "metin", label: "Metin", hint: "Yazıyı üret, marka renkli şablon kartına dök", href: "/studyo/metin" },
+  { id: "gorsel", label: "Görsel", hint: "Üret, yükle ya da Pixabay'dan seç; şablona yerleştir", href: "/studyo/gorsel" },
+  { id: "birlikte", label: "Metin + Görsel", hint: "Metin, görsel ve plan tek akışta", href: "/studyo/birlikte" },
+  { id: "video", label: "Video", hint: "Senaryo, sahne listesi ve stok klipler", href: "/studyo/video" },
+];
+
+/** Metin / Video yapıları için: ?adim= ve ?content= taşıyan bağlantı. */
+export function modeHref(mode: Exclude<StudioMode, "birlikte">, opts: { step?: string; contentId?: string; prompt?: string } = {}): string {
+  return withQuery(`/studyo/${mode}`, { adim: opts.step, content: opts.contentId, prompt: opts.prompt });
+}
+
+/** Birlikte: tek bir içeriğin yazım → görsel → plan akışı. */
 export function studioHref(opts: { step?: StudioStep; contentId?: string; prompt?: string } = {}): string {
-  return withQuery("/studyo", {
+  return withQuery("/studyo/birlikte", {
     adim: opts.step && opts.step !== "yaz" ? opts.step : undefined,
     content: opts.contentId,
     prompt: opts.prompt,

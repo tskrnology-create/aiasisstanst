@@ -28,7 +28,7 @@ const NAV = [
 ] as const;
 
 function isActive(item: (typeof NAV)[number], pathname: string): boolean {
-  return (item.match as readonly string[]).includes(pathname);
+  return (item.match as readonly string[]).includes(pathname) || (item.href === "/" && pathname.startsWith("/studyo"));
 }
 
 const THEME_KEY = "ai-asisst-theme";

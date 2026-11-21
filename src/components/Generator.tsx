@@ -22,7 +22,7 @@ import { CopyButton } from "./ShareControls";
 import { IconCalendar, IconImage, IconLayers, IconSparkles, IconWand } from "./Icons";
 import { useBusinessContext } from "./BusinessContext";
 import { MusicCard, PostChecklist, PostPackageCard, type GenMeta, type GeneratedRow } from "./PackageView";
-import { contentsHref, studioHref } from "@/lib/routes";
+import { contentsHref, modeHref, studioHref, type StudioMode } from "@/lib/routes";
 import { POST_FORMATS, formatsForPlatform, type PostFormat } from "@/lib/post-formats";
 
 
@@ -75,8 +75,32 @@ function PromptIdeas({ onPick }: { onPick: (text: string) => void }) {
   );
 }
 
-function ResultCard({ row, headline }: { row: GeneratedRow; headline?: string }) {
-  if (row.package) return <PostPackageCard row={row} pkg={row.package} headline={headline} />;
+function ResultCard({ row, headline, mode }: { row: GeneratedRow; headline?: string; mode: StudioMode }) {
+  if (row.package) {
+    if (mode === "metin") {
+      return (
+        <PostPackageCard
+          row={row}
+          pkg={row.package}
+          headline={headline}
+          nextStep={{ href: modeHref("metin", { step: "kart", contentId: row.id }), label: "Marka kartı yap" }}
+          planHref={null}
+        />
+      );
+    }
+    if (mode === "video") {
+      return (
+        <PostPackageCard
+          row={row}
+          pkg={row.package}
+          headline={headline}
+          nextStep={{ href: modeHref("video", { step: "klip", contentId: row.id }), label: "Sonraki adım: Klipler" }}
+          planHref={null}
+        />
+      );
+    }
+    return <PostPackageCard row={row} pkg={row.package} headline={headline} />;
+  }
   return <LegacyResultCard row={row} headline={headline} />;
 }
 
@@ -134,12 +158,13 @@ function LegacyResultCard({ row, headline }: { row: GeneratedRow; headline?: str
   );
 }
 
-export default function Generator() {
+export default function Generator({ mode = "birlikte" }: { mode?: StudioMode }) {
   const { activeBusinessId } = useBusinessContext();
-  return <GeneratorWorkspace key={activeBusinessId ?? "no-brand"} businessId={activeBusinessId} />;
+  return <GeneratorWorkspace key={activeBusinessId ?? "no-brand"} businessId={activeBusinessId} mode={mode} />;
 }
 
-function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
+function GeneratorWorkspace({ businessId, mode }: { businessId: string | null; mode: StudioMode }) {
+  const lockedFormat: PostFormat | null = mode === "video" ? "video" : null;
   // "Yeniden kullan" bağlantısı ?prompt=... ile gelir. Bu bileşen yalnızca
   // oturum açıldıktan sonra (istemcide) çizildiği için window güvenle okunur.
   const [prompt, setPrompt] = useState(() => {
@@ -183,7 +208,7 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
           tone: opts.tone || undefined,
           parentId: opts.parentId,
           kind: kind || undefined,
-          format: format || undefined,
+          format: lockedFormat ?? (format || undefined),
           platform: platform || undefined,
         }),
       });
@@ -267,19 +292,21 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
             </div>
           </div>
 
+          {!lockedFormat && (
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">Format</p>
             <div className="flex flex-wrap gap-1.5">
               <Chip active={format === ""} onClick={() => setFormat("")}>
                 Otomatik
               </Chip>
-              {POST_FORMATS.filter((f) => formatsForPlatform(platform || null).includes(f.id)).map((f) => (
+              {POST_FORMATS.filter((f) => formatsForPlatform(platform || null).includes(f.id) && !(mode === "metin" && f.id === "video")).map((f) => (
                 <Chip key={f.id} active={format === f.id} onClick={() => setFormat(f.id)}>
                   {f.label}
                 </Chip>
               ))}
             </div>
           </div>
+          )}
 
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">İçerik türü</p>
@@ -384,7 +411,7 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
 
       {main && (
         <div className="space-y-5">
-          <ResultCard row={main} />
+          <ResultCard row={main} mode={mode} />
           <PostChecklist row={main} platform={meta.platform} />
           {(main.package?.format === "video" || main.package?.format === "hikaye") && <MusicCard meta={meta} />}
 
@@ -411,7 +438,7 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
           </SectionCard>
 
           {alternatives.map((alt, i) => (
-            <ResultCard key={alt.id} row={alt} headline={i === 0 ? "Son alternatif" : "Alternatif"} />
+            <ResultCard key={alt.id} mode={mode} row={alt} headline={i === 0 ? "Son alternatif" : "Alternatif"} />
           ))}
 
           <Callout tone="info">{MANUAL_SHARE_NOTE}</Callout>

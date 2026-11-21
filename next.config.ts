@@ -13,7 +13,10 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/uret", destination: "/studyo", permanent: true },
-      { source: "/gorsel", destination: "/studyo?adim=gorsel", permanent: true },
+      { source: "/gorsel", destination: "/studyo/gorsel", permanent: true },
+      // Eski tek akışlı stüdyo bağlantıları (içerik/adım taşıyanlar) birlikte yapısına gider.
+      { source: "/studyo", has: [{ type: "query", key: "content" }], destination: "/studyo/birlikte", permanent: false },
+      { source: "/studyo", has: [{ type: "query", key: "adim" }], destination: "/studyo/birlikte", permanent: false },
       { source: "/takvim", destination: "/icerikler?gorunum=takvim", permanent: true },
       { source: "/kutuphane", destination: "/icerikler", permanent: true },
       { source: "/profil", destination: "/marka", permanent: true },

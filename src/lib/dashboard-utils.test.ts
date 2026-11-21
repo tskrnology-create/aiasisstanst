@@ -34,7 +34,7 @@ describe("dashboard-utils", () => {
     expect(nextAction({ ...base, total: 0 }).id).toBe("first");
     expect(nextAction({ ...base, drafts: 2 }).id).toBe("drafts");
     expect(nextAction({ ...base, upcoming7: 0, approved: 1 })).toMatchObject({ id: "plan", href: "/icerikler?gorunum=takvim" });
-    expect(nextAction({ ...base, upcoming7: 0 }).href).toBe("/studyo");
+    expect(nextAction({ ...base, upcoming7: 0 }).href).toBe("/");
     expect(nextAction(base).id).toBe("create");
   });
 });

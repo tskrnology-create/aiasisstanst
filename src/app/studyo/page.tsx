@@ -1,22 +1,15 @@
-import { Suspense } from "react";
 import AuthGate from "@/components/AuthGate";
 import PageHeader from "@/components/PageHeader";
-import Studio from "@/components/Studio";
+import { StudioHub } from "@/components/StudioModes";
 
 export const metadata = { title: "Stüdyo" };
 
-export default function StudioPage() {
+export default function StudioHubPage() {
   return (
     <>
-      <PageHeader
-        eyebrow="Stüdyo"
-        title="Bir içerik, baştan sona"
-        description="Fikrinizi yazın; metni, görseli ve paylaşım gününü aynı yerde hazırlayın. Paylaşım sosyal platformda sizin tarafınızdan yapılır."
-      />
+      <PageHeader eyebrow="Stüdyo" title="Ne hazırlayalım?" />
       <AuthGate>
-        <Suspense fallback={null}>
-          <Studio />
-        </Suspense>
+        <StudioHub />
       </AuthGate>
     </>
   );

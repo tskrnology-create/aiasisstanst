@@ -450,7 +450,7 @@ function LibraryWorkspace({
         title="Arşiviniz"
         description={`${rows.length} içerik · ${visible.length} gösteriliyor`}
         aside={
-          <LinkButton href={studioHref()} size="sm" variant="soft">
+          <LinkButton href={"/studyo"} size="sm" variant="soft">
             Yeni içerik üret
           </LinkButton>
         }
@@ -496,7 +496,7 @@ function LibraryWorkspace({
           title="Henüz kayıtlı içeriğiniz yok"
           description="İlk içeriğinizi üretin; taslak olarak kütüphaneye otomatik kaydedilir."
           action={
-            <LinkButton href={studioHref()} variant="primary" size="sm">
+            <LinkButton href={"/studyo"} variant="primary" size="sm">
               İlk içeriğinizi üretin
             </LinkButton>
           }

@@ -1,5 +1,5 @@
 // İşletme paneli yardımcıları (saf fonksiyonlar; tarayıcının yerel saat dilimiyle çalışır).
-import { contentsHref, studioHref } from "./routes";
+import { contentsHref } from "./routes";
 
 export function greeting(now: Date): string {
   const h = now.getHours();
@@ -85,8 +85,8 @@ export interface ChecklistStep {
 export function buildChecklist(input: ChecklistInput): { steps: ChecklistStep[]; percent: number } {
   const steps: ChecklistStep[] = [
     { id: "profile", label: "Marka profilini tamamla", hint: "Ürünler, hedef kitle ve marka sesi yapay zekâyı yönlendirir.", href: "/marka", done: input.profileComplete },
-    { id: "content", label: "İlk içeriğini üret", hint: "Gönderi, açıklama, hashtag ve reklam metni tek istekte.", href: studioHref(), done: input.contentCount > 0 },
-    { id: "visual", label: "İlk görselini oluştur", hint: "Şablon seç, marka renklerin ve logonla hazırla.", href: studioHref({ step: "gorsel" }), done: input.visualCount > 0 },
+    { id: "content", label: "İlk içeriğini üret", hint: "Gönderi, açıklama, hashtag ve reklam metni tek istekte.", href: "/", done: input.contentCount > 0 },
+    { id: "visual", label: "İlk görselini oluştur", hint: "Şablon seç, marka renklerin ve logonla hazırla.", href: "/studyo/gorsel", done: input.visualCount > 0 },
     { id: "plan", label: "İlk paylaşımı planla", hint: "Takvime ekle; zamanı gelince hatırlat.", href: contentsHref({ view: "takvim" }), done: input.plannedCount > 0 },
   ];
   const doneCount = steps.filter((s) => s.done).length;
@@ -135,7 +135,7 @@ export function nextAction(input: {
       title: "İlk içeriğinizi hazırlayın",
       description: "Bir fikir yazın ya da önerilen fikirlerden seçin; metni, görseli ve planı aynı yerde tamamlayın.",
       cta: "Stüdyoyu aç",
-      href: studioHref(),
+      href: "/",
       tone: "brand",
     };
   }
@@ -158,7 +158,7 @@ export function nextAction(input: {
           ? "Onaylı içerikleriniz hazır; paylaşım günlerini seçin."
           : "Yeni bir içerik hazırlayıp paylaşım gününü seçin.",
       cta: input.approved > 0 ? "Planla" : "Stüdyoyu aç",
-      href: input.approved > 0 ? contentsHref({ view: "takvim" }) : studioHref(),
+      href: input.approved > 0 ? contentsHref({ view: "takvim" }) : "/",
       tone: "brand",
     };
   }
@@ -167,7 +167,7 @@ export function nextAction(input: {
     title: "Takvim dolu görünüyor",
     description: "Bir sonraki hafta için yeni içerik hazırlayarak önde kalın.",
     cta: "Yeni içerik",
-    href: studioHref(),
+    href: "/",
     tone: "brand",
   };
 }

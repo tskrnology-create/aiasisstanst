@@ -320,6 +320,14 @@ export default function Assistant() {
             </div>
           )}
 
+          <Link href="/studyo" className="flex items-center justify-between rounded-2xl border border-line bg-surface p-3.5 text-sm shadow-soft transition hover:border-brand">
+            <span>
+              <span className="block font-semibold text-ink">Stüdyo: ayrı ayrı çalış</span>
+              <span className="block text-xs text-muted">Metin · Görsel · Metin + Görsel · Video</span>
+            </span>
+            <IconArrowRight className="h-4 w-4 text-brand" />
+          </Link>
+
           <div className="flex flex-wrap gap-1.5">
             <Chip onClick={() => run("Bana paylaşım fikirleri ver")} disabled={busy || !businessId}>
               <IconSparkles className="mr-1 inline h-3.5 w-3.5" />

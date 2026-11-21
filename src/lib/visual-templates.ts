@@ -67,6 +67,11 @@ export const templateUsesPhoto = (id: TemplateId) => !NO_PHOTO.has(id);
 /** Şablon fotoğrafla en iyi görünüyor mu? (yoksa arayüz ipucu verir) */
 export const templateWantsPhoto = (id: TemplateId) => PHOTO_BEST.has(id);
 
+/** Yalnız metin yapısı: fotoğraf gerektirmeyen, marka renkli zemin üzerinde yazı şablonları. */
+export const TEXT_TEMPLATES: readonly TemplateId[] = ["tipografi", "minimal", "alinti", "bolunmus", "rozet", "bant", "kart"];
+/** Yalnız görsel yapısı: fotoğrafı öne çıkaran şablonlar. */
+export const PHOTO_TEMPLATES: readonly TemplateId[] = TEMPLATES.map((t) => t.id).filter((id) => PHOTO_BEST.has(id));
+
 /** Her şablonun kısa açıklaması (arayüzde gösterilir). */
 export const TEMPLATE_USAGE: Record<TemplateId, string> = {
   tipografi: "Marka renginde zemin, dev başlık ve renkli daire. Fotoğraf eklerseniz daire içinde görünür.",

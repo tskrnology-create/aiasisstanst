@@ -120,7 +120,28 @@ function PackageBlock({ label, text, copy = true }: { label: string; text: strin
   );
 }
 
-export function PostPackageCard({ row, pkg, headline }: { row: GeneratedRow; pkg: PostPackage; headline?: string }) {
+export interface NextStepLink {
+  href: string;
+  label: string;
+}
+
+export function PostPackageCard({
+  row,
+  pkg,
+  headline,
+  nextStep,
+  planHref,
+}: {
+  row: GeneratedRow;
+  pkg: PostPackage;
+  headline?: string;
+  /** undefined → birlikte akışının "Görsel" adımı; null → buton gösterilmez. */
+  nextStep?: NextStepLink | null;
+  /** undefined → birlikte akışının "Planla" adımı; null → bağlantı gösterilmez. */
+  planHref?: string | null;
+}) {
+  const next = nextStep === undefined ? { href: studioHref({ step: "gorsel", contentId: row.id }), label: "Sonraki adım: Görsel" } : nextStep;
+  const plan = planHref === undefined ? studioHref({ step: "planla", contentId: row.id }) : planHref;
   const format = POST_FORMATS.find((f) => f.id === pkg.format);
   const shareAll = [row.post_text ?? "", pkg.hashtags.join(" ")].filter((x) => x.trim()).join("\n\n");
   return (
@@ -194,14 +215,18 @@ export function PostPackageCard({ row, pkg, headline }: { row: GeneratedRow; pkg
           <LinkButton href={contentsHref({ contentId: row.id })} variant="secondary" size="sm">
             İçeriği düzenle
           </LinkButton>
-          <LinkButton href={studioHref({ step: "gorsel", contentId: row.id })} variant="primary" size="sm">
-            <IconImage className="h-3.5 w-3.5" />
-            Sonraki adım: Görsel
-          </LinkButton>
-          <LinkButton href={studioHref({ step: "planla", contentId: row.id })} variant="ghost" size="sm">
-            <IconCalendar className="h-3.5 w-3.5" />
-            Doğrudan planla
-          </LinkButton>
+          {next && (
+            <LinkButton href={next.href} variant="primary" size="sm">
+              <IconImage className="h-3.5 w-3.5" />
+              {next.label}
+            </LinkButton>
+          )}
+          {plan && (
+            <LinkButton href={plan} variant="ghost" size="sm">
+              <IconCalendar className="h-3.5 w-3.5" />
+              Doğrudan planla
+            </LinkButton>
+          )}
         </div>
       </div>
     </SectionCard>
