@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import AppShell from "@/components/AppShell";
 import "./globals.css";
 
-const inter = Inter({
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin", "latin-ext"],
   display: "swap",
-  variable: "--font-inter",
+  variable: "--font-jakarta",
 });
 
 export const metadata: Metadata = {
@@ -20,8 +20,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f5f9" },
-    { media: "(prefers-color-scheme: dark)", color: "#07070c" },
+    { media: "(prefers-color-scheme: light)", color: "#fbf6ef" },
+    { media: "(prefers-color-scheme: dark)", color: "#15110e" },
   ],
 };
 
@@ -30,7 +30,7 @@ const themeInit = `(function(){try{var k='ai-asisst-theme';var s=localStorage.ge
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="tr" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="tr" className={`${jakarta.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>

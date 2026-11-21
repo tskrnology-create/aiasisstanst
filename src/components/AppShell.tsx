@@ -12,7 +12,7 @@ import { BusinessContextProvider, useBusinessContext, type BusinessOption } from
 import { cx, selectClass } from "./Ui";
 import {
   IconBuilding,
-  IconLayers,
+  IconCalendar,
   IconLibrary,
   IconLogout,
   IconMoon,
@@ -21,11 +21,15 @@ import {
 } from "./Icons";
 
 const NAV = [
-  { href: "/", label: "Bugün", short: "Bugün", icon: IconLayers, description: "Sıradaki işler" },
-  { href: "/studyo", label: "Stüdyo", short: "Stüdyo", icon: IconSparkles, description: "Yaz, görsel hazırla, planla" },
-  { href: "/icerikler", label: "İçerikler", short: "İçerikler", icon: IconLibrary, description: "Liste ve takvim" },
-  { href: "/marka", label: "Marka", short: "Marka", icon: IconBuilding, description: "Profil ve sosyal hesaplar" },
+  { href: "/", label: "Asistan", short: "Asistan", icon: IconSparkles, description: "Yaz, fikir al, planla", match: ["/", "/studyo"] },
+  { href: "/hafta", label: "Hafta", short: "Hafta", icon: IconCalendar, description: "Bu haftanın planı", match: ["/hafta"] },
+  { href: "/icerikler", label: "İçerikler", short: "İçerikler", icon: IconLibrary, description: "Liste ve takvim", match: ["/icerikler"] },
+  { href: "/marka", label: "Marka", short: "Marka", icon: IconBuilding, description: "Profil, renk, logo", match: ["/marka"] },
 ] as const;
+
+function isActive(item: (typeof NAV)[number], pathname: string): boolean {
+  return (item.match as readonly string[]).includes(pathname);
+}
 
 const THEME_KEY = "ai-asisst-theme";
 const BUSINESS_SELECTION_KEY = "ai-asisst-active-business";
@@ -35,14 +39,14 @@ function Wordmark({ compact = false }: { compact?: boolean }) {
     <span className="flex items-center gap-2.5">
       <span
         aria-hidden="true"
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[linear-gradient(135deg,var(--brand),var(--accent))] text-[13px] font-extrabold text-white shadow-[0_8px_20px_-10px_var(--brand)]"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand text-[13px] font-extrabold text-brand-ink shadow-[0_8px_20px_-10px_var(--brand)]"
       >
         Aı
       </span>
       {!compact && (
         <span className="min-w-0">
           <span className="block truncate text-sm font-semibold tracking-tight text-ink">Aı Asisst</span>
-          <span className="block truncate text-[11px] text-muted">Sosyal medya stüdyosu</span>
+          <span className="block truncate text-[11px] text-muted">Sosyal medya asistanı</span>
         </span>
       )}
     </span>
@@ -184,7 +188,7 @@ function ManualBadge() {
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const current = NAV.find((item) => item.href === pathname) ??
+  const current = NAV.find((item) => isActive(item, pathname)) ??
     (pathname === "/marka" ? { label: "Marka ve sosyal hesaplar" } : undefined);
   const session = useSession();
   const userId = session?.user.id ?? null;
@@ -297,7 +301,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </p>
           <ul className="space-y-1">
             {NAV.map((item) => {
-              const active = pathname === item.href;
+              const active = isActive(item, pathname);
               const Icon = item.icon;
               return (
                 <li key={item.href}>
@@ -346,7 +350,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* İçerik */}
       <div className="md:pl-[260px]">
-        <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-5 sm:px-6 md:pb-12 md:pt-8 lg:px-8">
+        <main className="mx-auto w-full max-w-5xl px-4 pb-32 pt-5 sm:px-6 md:pb-12 md:pt-8 lg:px-8">
           {current && (
             <p className="sr-only" aria-live="polite">
               Şu anki sayfa: {current.label}
@@ -364,11 +368,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobil alt sekme çubuğu */}
       <nav
         aria-label="Ana menü"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
       >
-        <ul className="no-scrollbar flex items-stretch justify-between overflow-x-auto px-1.5 py-1.5">
+        <ul className="pointer-events-auto mx-auto flex max-w-md items-stretch justify-between rounded-full border border-line bg-surface/95 p-1.5 shadow-pop backdrop-blur-xl">
           {NAV.map((item) => {
-            const active = pathname === item.href;
+            const active = isActive(item, pathname);
             const Icon = item.icon;
             return (
               <li key={item.href} className="min-w-0 flex-1">
@@ -376,8 +380,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cx(
-                    "flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] font-medium transition",
-                    active ? "bg-brand-soft text-brand dark:text-brand-strong" : "text-muted"
+                    "flex flex-col items-center gap-0.5 rounded-full px-1 py-2 text-[10px] font-semibold transition",
+                    active ? "bg-brand text-brand-ink" : "text-muted"
                   )}
                 >
                   <Icon className="h-[18px] w-[18px]" />

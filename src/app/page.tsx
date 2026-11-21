@@ -1,12 +1,15 @@
+import { Suspense } from "react";
 import AuthGate from "@/components/AuthGate";
-import Dashboard from "@/components/Dashboard";
+import Assistant from "@/components/Assistant";
 
-export const metadata = { title: "İşletme paneli" };
+export const metadata = { title: "Asistan" };
 
 export default function Home() {
   return (
     <AuthGate>
-      <Dashboard />
+      <Suspense fallback={null}>
+        <Assistant />
+      </Suspense>
     </AuthGate>
   );
 }
