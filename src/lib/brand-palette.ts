@@ -126,7 +126,7 @@ export function hslToHex(h: number, s: number, l: number): string {
 }
 
 /** Sabit ton ve doygunlukta, hedef kontrasta en yakın parlaklığı arar. */
-function matchContrast(base: string, hue: number, saturation: number, target: number): string {
+export function matchContrast(base: string, hue: number, saturation: number, target: number): string {
   let best = FALLBACK_SECONDARY;
   let bestScore = Number.POSITIVE_INFINITY;
   for (let step = 0; step <= 40; step++) {

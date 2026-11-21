@@ -21,180 +21,17 @@ import {
   cx,
   hintClass,
   inputClass,
-  labelClass,
 } from "./Ui";
 import { ALL_SHARE_TARGETS } from "@/lib/share-links";
-import { IconCheck, IconPlus, IconTrash, IconWand } from "./Icons";
-import {
-  FALLBACK_PRIMARY,
-  FALLBACK_SECONDARY,
-  contrastText,
-  isValidHex,
-  normalizeHex,
-  paletteAdvice,
-  percent,
-  readPalette,
-  suggestSecondary,
-} from "@/lib/brand-palette";
+import { IconCheck, IconPlus, IconTrash } from "./Icons";
 import { useBusinessContext } from "./BusinessContext";
-
-const MAX_LOGO_BYTES = 500 * 1024; // localStorage sınırı nedeniyle; Supabase'de kalkacak
+import BrandColorStudio from "./BrandColorStudio";
+import LogoStudio from "./LogoStudio";
 
 const initialsOf = (platform: SocialPlatform) =>
   ALL_SHARE_TARGETS.find((t) => t.platform === platform)?.initials ?? "•";
 const colorOf = (platform: SocialPlatform) =>
   ALL_SHARE_TARGETS.find((t) => t.platform === platform)?.color ?? "#6b7280";
-
-const SLOTS = [
-  {
-    index: 0,
-    title: "Ana renk",
-    role: "baskın",
-    hint: "Görsellerin büyük bölümü bu renkle kurulur.",
-    placeholder: "#E91E63",
-  },
-  {
-    index: 1,
-    title: "Yardımcı renk",
-    role: "vurgu",
-    hint: "Band, çizgi ve öne çıkan kelime için kullanılır.",
-    placeholder: "#2B2B3A",
-  },
-] as const;
-
-/** Markanın iki rengini ve zorunlu kullanım oranını seçtiren alan. */
-function BrandColorSlots({
-  colors,
-  onChange,
-  "aria-describedby": describedBy,
-  "aria-invalid": invalid,
-}: {
-  colors: string[];
-  onChange: (next: string[]) => void;
-  "aria-describedby"?: string;
-  "aria-invalid"?: boolean;
-}) {
-  const current = [colors[0] ?? "", colors[1] ?? ""];
-  const bothValid = isValidHex(current[0]) && isValidHex(current[1]);
-  // Geçersiz/eksik durumda palete düşülür; önizleme yine de oranı gösterir.
-  const palette = readPalette(bothValid ? current : []);
-  const advice = paletteAdvice(palette);
-
-  function set(index: number, value: string) {
-    const next = [...current];
-    next[index] = value;
-    onChange(next);
-  }
-
-  return (
-    <div className="space-y-4" role="group" aria-label="Marka renkleri" aria-describedby={describedBy}>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {SLOTS.map((slot) => {
-          const value = current[slot.index];
-          const swatch =
-            normalizeHex(value) ?? (slot.index === 0 ? FALLBACK_PRIMARY : FALLBACK_SECONDARY);
-          return (
-            <div
-              key={slot.index}
-              className="space-y-2.5 rounded-xl border border-line bg-surface-2/60 p-3"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-ink">{slot.title}</span>
-                <Tag tone={slot.index === 0 ? "brand" : "neutral"}>
-                  {slot.role} · {percent(slot.index === 0 ? palette.share : palette.accent)}
-                </Tag>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  aria-label={`${slot.title} seçici`}
-                  aria-describedby={describedBy}
-                  aria-invalid={invalid}
-                  value={swatch}
-                  onChange={(e) => set(slot.index, e.target.value)}
-                  className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-line bg-transparent"
-                />
-                <input
-                  aria-label={`${slot.title} kodu`}
-                  aria-describedby={describedBy}
-                  aria-invalid={invalid}
-                  className={cx(inputClass, "font-mono text-xs uppercase")}
-                  value={value}
-                  onChange={(e) => set(slot.index, e.target.value.trim())}
-                  placeholder={slot.placeholder}
-                />
-              </div>
-              <p className={hintClass}>{slot.hint}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={!isValidHex(current[0])}
-          onClick={() => set(1, (suggestSecondary(current[0]) ?? "").toUpperCase())}
-        >
-          <IconWand />
-          Tamamlayıcı rengi öner
-        </Button>
-        {bothValid && (
-          <Tag tone="neutral">
-            Ana renk üzerinde yazı: {palette.onPrimary === "#ffffff" ? "beyaz" : "koyu"}
-          </Tag>
-        )}
-      </div>
-
-      <div className="space-y-3 rounded-xl border border-line bg-surface p-3.5">
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="font-semibold uppercase tracking-[0.12em] text-faint">
-            Kullanım oranı
-          </span>
-          <span className="font-mono text-muted">
-            {percent(palette.share)} / {percent(palette.accent)}
-          </span>
-        </div>
-        <div className="flex h-12 overflow-hidden rounded-lg border border-line">
-          <span
-            className="grid place-items-center text-[11px] font-semibold"
-            style={{
-              width: `${palette.share * 100}%`,
-              backgroundColor: bothValid ? palette.primary : "var(--surface-2)",
-              color: contrastText(palette.primary),
-            }}
-          >
-            Ana
-          </span>
-          <span
-            className="grid place-items-center text-[11px] font-semibold"
-            style={{
-              width: `${palette.accent * 100}%`,
-              backgroundColor: bothValid ? palette.secondary : "var(--surface-2)",
-              color: contrastText(palette.secondary),
-            }}
-          >
-            Vurgu
-          </span>
-        </div>
-
-        {bothValid ? (
-          <Callout tone={advice.tone === "ok" ? "success" : "warning"}>{advice.text}</Callout>
-        ) : (
-          <Callout tone="info">
-            İki renk de seçildiğinde oran önizlemesi ve kontrast uyarısı burada görünür.
-          </Callout>
-        )}
-        <p className={hintClass}>
-          Oran hem şablonlara hem yapay zekâ arka plan istemine otomatik işlenir; tek bir görsel
-          için oranı Görsel stüdyosundan değiştirebilirsiniz.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export default function ProfileForm() {
   const { activeBusinessId, isBusinessLoading, refreshBusinesses } = useBusinessContext();
@@ -219,7 +56,6 @@ function ProfileFormWorkspace({
 }) {
   const [form, setForm] = useState<StoredBusiness>(EMPTY_BUSINESS);
   const [errors, setErrors] = useState<ValidationErrors>({});
-  const [logoError, setLogoError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
@@ -250,23 +86,6 @@ function ProfileFormWorkspace({
   function update<K extends keyof StoredBusiness>(key: K, value: StoredBusiness[K]) {
     setForm((f) => ({ ...f, [key]: value }));
     setSavedAt(null);
-  }
-
-  function onLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setLogoError(null);
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      setLogoError("Logo PNG, JPG veya WebP olmalı.");
-      return;
-    }
-    if (file.size > MAX_LOGO_BYTES) {
-      setLogoError("Logo 500 KB'den küçük olmalı.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => update("logo_data_url", reader.result as string);
-    reader.readAsDataURL(file);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -418,52 +237,25 @@ function ProfileFormWorkspace({
           />
         </Field>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <Field label="Marka renkleri" error={errors.brand_colors} errorId="biz-colors-error">
-            <BrandColorSlots
+        <div className="mt-6 space-y-6">
+          <Field label="Marka renkleri" error={undefined}>
+            <BrandColorStudio
               colors={colors.length ? colors : ["", ""]}
               onChange={(next) => update("brand_colors", next)}
+              brandName={form.name}
+              logoDataUrl={form.logo_data_url ?? null}
+              error={errors.brand_colors}
+              errorId="biz-colors-error"
             />
           </Field>
 
-          <Field label="Logo" htmlFor="biz-logo" error={logoError ?? undefined} errorId="biz-logo-error" hint="PNG, JPG veya WebP, en fazla 500 KB.">
-            <div className="flex items-center gap-4 rounded-xl border border-dashed border-line-strong bg-surface-2/50 p-4">
-              {form.logo_data_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={form.logo_data_url}
-                  alt="Logo önizleme"
-                  className="h-16 w-16 rounded-xl border border-line bg-surface object-contain p-1"
-                />
-              ) : (
-                <span className="grid h-16 w-16 place-items-center rounded-xl border border-line bg-surface text-xs text-faint">
-                  Logo
-                </span>
-              )}
-              <div className="min-w-0 flex-1 space-y-2">
-                <label className={cx(labelClass, "inline-flex cursor-pointer text-sm text-brand dark:text-brand-strong")}>
-                  {form.logo_data_url ? "Logoyu değiştir" : "Logo yükle"}
-                  <input
-                    id="biz-logo"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    aria-invalid={logoError ? true : undefined}
-                    aria-describedby={logoError ? "biz-logo-error" : undefined}
-                    onChange={onLogoChange}
-                    className="sr-only"
-                  />
-                </label>
-                {form.logo_data_url && (
-                  <button
-                    type="button"
-                    onClick={() => update("logo_data_url", null)}
-                    className="block text-xs text-muted transition hover:text-danger"
-                  >
-                    Kaldır
-                  </button>
-                )}
-              </div>
-            </div>
+          <Field label="Logo" >
+            <LogoStudio
+              logo={form.logo_data_url ?? null}
+              onChange={(next) => update("logo_data_url", next)}
+              brandName={form.name}
+              colors={colors}
+            />
           </Field>
         </div>
       </SectionCard>
