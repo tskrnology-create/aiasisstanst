@@ -24,6 +24,7 @@ import { useBusinessContext } from "./BusinessContext";
 import { contentsHref, studioHref } from "@/lib/routes";
 import { analyzePost } from "@/lib/platform-playbook";
 import { suggestMusic } from "@/lib/music-suggestions";
+import { POST_FORMATS, formatsForPlatform, totalSeconds, type PostFormat, type PostPackage } from "@/lib/post-formats";
 
 interface GeneratedRow {
   id: string;
@@ -33,6 +34,7 @@ interface GeneratedRow {
   hashtags: string[];
   ad_text: string | null;
   story_text: string | null;
+  package?: PostPackage | null;
 }
 
 const MAX_PROMPT_LEN = 500;
@@ -169,7 +171,113 @@ function MusicCard({ meta }: { meta: GenMeta }) {
   );
 }
 
+function PackageBlock({ label, text, copy = true }: { label: string; text: string; copy?: boolean }) {
+  if (!text.trim()) return null;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">{label}</p>
+        {copy && <CopyButton text={text} label="Kopyala" />}
+      </div>
+      <p className="whitespace-pre-wrap rounded-xl border border-line bg-surface-2/70 p-3.5 text-sm leading-relaxed text-ink">{text}</p>
+    </div>
+  );
+}
+
+function PostPackageCard({ row, pkg, headline }: { row: GeneratedRow; pkg: PostPackage; headline?: string }) {
+  const format = POST_FORMATS.find((f) => f.id === pkg.format);
+  const shareAll = [row.post_text ?? "", pkg.hashtags.join(" ")].filter((x) => x.trim()).join("\n\n");
+  return (
+    <SectionCard
+      title={headline ?? format?.label ?? "Paylaşım paketi"}
+      description={row.tone ? `Ton: ${row.tone}` : undefined}
+      aside={
+        <div className="flex flex-wrap items-center gap-2">
+          <Tag tone="ok">Kütüphaneye kaydedildi</Tag>
+          <CopyButton text={shareAll} label="Paylaşım metnini kopyala" />
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <PackageBlock label="1 · Kanca" text={pkg.hook} />
+        <PackageBlock label="2 · Gövde" text={pkg.body} />
+        <PackageBlock label="3 · Çağrı" text={pkg.cta} />
+        {pkg.hashtags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {pkg.hashtags.map((t) => (
+              <Tag key={t}>{t}</Tag>
+            ))}
+          </div>
+        )}
+
+        {pkg.slides.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">
+              {pkg.format === "hikaye" ? "Hikâye kareleri" : "Slaytlar"} ({pkg.slides.length})
+            </p>
+            <ol className="grid gap-2 sm:grid-cols-2">
+              {pkg.slides.map((s, i) => (
+                <li key={i} className="rounded-xl border border-line bg-surface p-3.5">
+                  <p className="text-[11px] font-semibold text-brand dark:text-brand-strong">
+                    {i === 0 ? "Kapak" : i === pkg.slides.length - 1 ? `Slayt ${i + 1} · Çağrı` : `Slayt ${i + 1}`}
+                  </p>
+                  {s.title && <p className="mt-0.5 text-sm font-semibold text-ink">{s.title}</p>}
+                  {s.text && <p className="mt-0.5 text-sm text-ink-soft">{s.text}</p>}
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {pkg.scenes.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">
+              Sahneler · toplam {totalSeconds(pkg.scenes)} sn
+            </p>
+            <ol className="space-y-2">
+              {pkg.scenes.map((sc, i) => (
+                <li key={i} className="flex gap-3 rounded-xl border border-line bg-surface p-3.5">
+                  <span className="grid h-9 w-11 shrink-0 place-items-center rounded-lg bg-brand-soft text-xs font-bold text-brand dark:text-brand-strong">
+                    {sc.seconds} sn
+                  </span>
+                  <div className="min-w-0 space-y-0.5 text-sm">
+                    <p className="text-ink">{sc.visual}</p>
+                    {sc.on_screen_text && <p className="text-ink-soft">Ekranda yazı: “{sc.on_screen_text}”</p>}
+                    {sc.voiceover && <p className="text-muted">Ses: {sc.voiceover}</p>}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        <PackageBlock label="Görsel fikri" text={pkg.visual_brief} />
+        <PackageBlock label="Alternatif metin (erişilebilirlik)" text={pkg.alt_text} />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <LinkButton href={contentsHref({ contentId: row.id })} variant="secondary" size="sm">
+            İçeriği düzenle
+          </LinkButton>
+          <LinkButton href={studioHref({ step: "gorsel", contentId: row.id })} variant="primary" size="sm">
+            <IconImage className="h-3.5 w-3.5" />
+            Sonraki adım: Görsel
+          </LinkButton>
+          <LinkButton href={studioHref({ step: "planla", contentId: row.id })} variant="ghost" size="sm">
+            <IconCalendar className="h-3.5 w-3.5" />
+            Doğrudan planla
+          </LinkButton>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
 function ResultCard({ row, headline }: { row: GeneratedRow; headline?: string }) {
+  if (row.package) return <PostPackageCard row={row} pkg={row.package} headline={headline} />;
+  return <LegacyResultCard row={row} headline={headline} />;
+}
+
+function LegacyResultCard({ row, headline }: { row: GeneratedRow; headline?: string }) {
   const [tab, setTab] = useState<BlockId>("post_text");
   const block = BLOCKS.find((b) => b.id === tab) ?? BLOCKS[0];
   const value = block.get(row);
@@ -238,6 +346,7 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
   });
   const [tone, setTone] = useState<Tone | "">("");
   const [kind, setKind] = useState<ContentKind | "">("");
+  const [format, setFormat] = useState<PostFormat | "">("");
   const [platform, setPlatform] = useState<PlatformId | "">("");
   const [ideas, setIdeas] = useState<ContentIdea[] | null>(null);
   const [ideasBusy, setIdeasBusy] = useState(false);
@@ -271,6 +380,7 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
           tone: opts.tone || undefined,
           parentId: opts.parentId,
           kind: kind || undefined,
+          format: format || undefined,
           platform: platform || undefined,
         }),
       });
@@ -355,6 +465,20 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
           </div>
 
           <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">Format</p>
+            <div className="flex flex-wrap gap-1.5">
+              <Chip active={format === ""} onClick={() => setFormat("")}>
+                Otomatik
+              </Chip>
+              {POST_FORMATS.filter((f) => formatsForPlatform(platform || null).includes(f.id)).map((f) => (
+                <Chip key={f.id} active={format === f.id} onClick={() => setFormat(f.id)}>
+                  {f.label}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">İçerik türü</p>
             <div className="flex flex-wrap gap-1.5">
               <Chip active={kind === ""} onClick={() => setKind("")}>
@@ -375,7 +499,7 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
                 Genel
               </Chip>
               {PLATFORMS.map((p) => (
-                <Chip key={p.id} active={platform === p.id} onClick={() => setPlatform(p.id)}>
+                <Chip key={p.id} active={platform === p.id} onClick={() => { setPlatform(p.id); if (format && !formatsForPlatform(p.id).includes(format)) setFormat(""); }}>
                   {p.label}
                 </Chip>
               ))}
@@ -459,7 +583,7 @@ function GeneratorWorkspace({ businessId }: { businessId: string | null }) {
         <div className="space-y-5">
           <ResultCard row={main} />
           <PostChecklist row={main} platform={meta.platform} />
-          <MusicCard meta={meta} />
+          {(main.package?.format === "video" || main.package?.format === "hikaye") && <MusicCard meta={meta} />}
 
           <SectionCard
             step="Alternatifler"

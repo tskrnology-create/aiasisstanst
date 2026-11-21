@@ -6,6 +6,7 @@
 import { paletteRuleTr, paletteSummaryTr, readPalette } from "./brand-palette";
 import { CONTENT_KINDS, type ContentKind, type PlatformId } from "./content-kinds";
 import { PLAYBOOK, UNIVERSAL_RULES } from "./platform-playbook";
+import { POST_FORMATS, packageSchemaPrompt, recommendFormat, type PostFormat } from "./post-formats";
 
 export type ContentLanguage = "tr" | "en";
 
@@ -25,6 +26,7 @@ export interface GenerateRequest {
   tone?: string;          // alternatif ton istenirse: "esprili", "resmi" ...
   kind?: ContentKind;     // içerik türü: kampanya, duyuru ...
   platform?: PlatformId;  // hedef platform: karakter/hashtag kuralları değişir
+  format?: PostFormat;    // paylaşım formatı: tek görsel, karusel, video, hikâye, metin
 }
 
 export interface ChatMessage {
@@ -75,6 +77,7 @@ export function buildGenerateMessages(
     : `Ton: marka diline uygun.`;
 
   const kind = CONTENT_KINDS.find((k) => k.id === req.kind);
+  const format = POST_FORMATS.find((f) => f.id === (req.format ?? recommendFormat(req.platform, req.kind)))!;
   const platformGuide = req.platform ? PLAYBOOK[req.platform].prompt : "";
 
   const user = [
@@ -84,14 +87,10 @@ export function buildGenerateMessages(
     UNIVERSAL_RULES,
     toneLine,
     ``,
+    `Format: ${format.label}. ${format.guide}`,
+    ``,
     `Şu alanları içeren bir JSON nesnesi üret:`,
-    `{`,
-    `  "post_text": "Instagram gönderi metni",`,
-    `  "caption": "açıklama",`,
-    `  "hashtags": ["#örnek", "..."],`,
-    `  "ad_text": "reklam metni",`,
-    `  "story_text": "hikâye metni (kısa)"`,
-    `}`,
+    packageSchemaPrompt(format.id),
   ]
     .filter((line, i, all) => line !== "" || all[i - 1] !== "")
     .join("\n");

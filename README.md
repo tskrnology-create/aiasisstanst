@@ -65,6 +65,7 @@ Supabase başlangıç SQL'leri:
 5. `schema_v5_workspace_and_manual_publishing.sql` (manuel yayın günlüğü/hedef hesap, atomik sosyal hesap eşitleme ve üretim kotası, telafi edilebilir Storage temizliği)
 6. `schema_v6_atomic_profile_and_media_integrity.sql` (profil+sosyal hesapların tek transaction'da kaydı ve içerik business_id değişmezliği)
 7. `schema_v7_hardening_and_account.sql` (anon yetkilerinin kaldırılması, kullanıcı başına 10 marka sınırı, hesap silme RPC'si `delete_my_account`, alan uzunluk sınırları). Hesabım sayfasındaki "Hesabı sil" bu dosya uygulanmadan çalışmaz.
+8. `schema_v8_post_packages.sql` (içeriğe `format` ve yapılandırılmış `package` sütunları: kanca, gövde, çağrı, slayt/sahne, görsel fikri). Uygulanmazsa üretim yine çalışır, yalnızca paket yapısı saklanmaz.
 
 Şema değişikliklerini canlı veritabanına uygulamadan önce yedek alın ve staging ortamında deneyin. İki farklı kullanıcıyla RLS izolasyonunu doğrulamadan canlıya çıkmayın.
 

@@ -63,7 +63,10 @@ const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 // Metni görsele uygun kısa bir başlığa çevirir (fazla boşlukları temizler).
 function toHeadline(text: string | null): string {
-  return (text ?? "").replace(/[ \t]+/g, " ").trim().slice(0, MAX_HEADLINE);
+  // Paylaşım paketlerinde ilk paragraf kancadır; görselde başlık olarak o kullanılır.
+  const first = (text ?? "").trim().split(/\n\s*\n/)[0] ?? "";
+  const source = first.length >= 8 ? first : (text ?? "");
+  return source.replace(/[ \t]+/g, " ").trim().slice(0, MAX_HEADLINE);
 }
 
 export default function VisualCreator() {

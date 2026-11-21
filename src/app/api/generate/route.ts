@@ -2,11 +2,8 @@
 import { publicTextError } from "@/lib/public-error";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { authenticateRequest, getBusinessById, isUuid } from "@/lib/api-user";
-import {
-  buildGenerateMessages,
-  parseGeneratedContent,
-  type BusinessProfile,
-} from "@/lib/brand-prompt";
+import { buildGenerateMessages, type BusinessProfile } from "@/lib/brand-prompt";
+import { isPostFormat, packageToLegacy, parsePostPackage, recommendFormat } from "@/lib/post-formats";
 import { isTone } from "@/lib/tones";
 import { isContentKind, isPlatformId } from "@/lib/content-kinds";
 import { generateJson, getProvider } from "@/lib/llm";
@@ -33,7 +30,7 @@ export async function POST(request: Request) {
     return json({ error: "Yapay zekâ servisi şu an kullanılamıyor. Lütfen daha sonra tekrar deneyin." }, 503);
   }
 
-  let body: { prompt?: unknown; tone?: unknown; parentId?: unknown; businessId?: unknown; kind?: unknown; platform?: unknown };
+  let body: { prompt?: unknown; tone?: unknown; parentId?: unknown; businessId?: unknown; kind?: unknown; platform?: unknown; format?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -53,6 +50,9 @@ export async function POST(request: Request) {
   if (kind !== undefined && !isContentKind(kind)) return json({ error: "Geçersiz içerik türü." }, 400);
   const platform = body.platform === undefined || body.platform === null || body.platform === "" ? undefined : body.platform;
   if (platform !== undefined && !isPlatformId(platform)) return json({ error: "Geçersiz platform." }, 400);
+  const rawFormat = body.format === undefined || body.format === null || body.format === "" ? undefined : body.format;
+  if (rawFormat !== undefined && !isPostFormat(rawFormat)) return json({ error: "Geçersiz format." }, 400);
+  const format = rawFormat ?? recommendFormat(platform, kind);
   const parentId = body.parentId === undefined || body.parentId === null || body.parentId === ""
     ? null
     : isUuid(body.parentId) ? body.parentId : null;
@@ -99,40 +99,39 @@ export async function POST(request: Request) {
       brand_colors: business.brand_colors ?? [],
       content_language: business.content_language,
     };
-    const result = await generateJson(buildGenerateMessages(profile, { userPrompt: prompt, tone, kind, platform }));
+    const result = await generateJson(buildGenerateMessages(profile, { userPrompt: prompt, tone, kind, platform, format }));
     if (!result.ok) return json({ error: publicTextError(result.message) }, 502);
     // Model yanıtı alındıktan sonra maliyet oluştu; kayıt başarısız olsa bile kota iade edilmez.
     saved = true;
 
-    let generated;
+    let pkg;
     try {
-      generated = parseGeneratedContent(result.text);
+      pkg = parsePostPackage(result.text, format);
     } catch {
       return json({ error: "Üretilen içerik okunamadı, tekrar deneyin." }, 502);
     }
-    generated.hashtags = generated.hashtags
-      .map((tag) => tag.trim())
-      .filter(Boolean)
-      .map((tag) => (tag.startsWith("#") ? tag : `#${tag.replace(/\s+/g, "")}`))
-      .slice(0, 20);
+    const legacy = packageToLegacy(pkg);
 
-    const { data: content, error: saveError } = await supabase
+    const base = {
+      business_id: business.id,
+      parent_id: parentId,
+      prompt,
+      tone: tone ?? null,
+      language: business.content_language,
+      ...legacy,
+      status: "draft",
+    };
+    let { data: content, error: saveError } = await supabase
       .from("contents")
-      .insert({
-        business_id: business.id,
-        parent_id: parentId,
-        prompt,
-        tone: tone ?? null,
-        language: business.content_language,
-        post_text: generated.post_text,
-        caption: generated.caption,
-        hashtags: generated.hashtags,
-        ad_text: generated.ad_text,
-        story_text: generated.story_text,
-        status: "draft",
-      })
+      .insert({ ...base, format: pkg.format, package: pkg })
       .select("*")
       .single();
+    if (saveError && (saveError.code === "42703" || saveError.code === "PGRST204")) {
+      // schema_v8 henüz uygulanmamış: yapılandırılmış paket saklanamaz, metin yine de kaydedilir.
+      console.error("contents.package sütunu yok; schema_v8 uygulanmalı.");
+      ({ data: content, error: saveError } = await supabase.from("contents").insert(base).select("*").single());
+      if (content) content = { ...content, format: pkg.format, package: pkg };
+    }
     if (saveError || !content) {
       console.error("İçerik kaydedilemedi:", saveError?.code);
       return json({ error: "İçerik kaydedilemedi." }, 500);
