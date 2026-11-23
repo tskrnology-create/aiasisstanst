@@ -6,6 +6,10 @@ import { snippet } from "@/lib/dashboard-utils";
 
 export interface UpcomingItem {
   id: string;
+  contentId: string;
+  /** Plandan gelen ama henüz yazılmamış fikir. */
+  ready: boolean;
+  prompt: string;
   platform: string | null;
   scheduled_at: string;
   text: string;
@@ -59,7 +63,7 @@ export async function loadDashboard(businessId: string): Promise<DashboardData> 
       items().eq("done", true).gte("scheduled_at", monthStart),
       sb
         .from("calendar_items")
-        .select("id, platform, scheduled_at, contents(prompt, post_text, caption)")
+        .select("id, content_id, platform, scheduled_at, contents(prompt, post_text, caption, visual_url)")
         .eq("business_id", businessId)
         .eq("done", false)
         .lt("scheduled_at", weekEnd)
@@ -79,9 +83,10 @@ export async function loadDashboard(businessId: string): Promise<DashboardData> 
   );
   if (failed?.error) throw new Error(failed.error.message);
 
-  type Embedded = { prompt?: string; post_text?: string | null; caption?: string | null };
+  type Embedded = { prompt?: string; post_text?: string | null; caption?: string | null; visual_url?: string | null };
   const upcomingRows = ((upcoming.data ?? []) as unknown as Array<{
     id: string;
+    content_id: string;
     platform: string | null;
     scheduled_at: string;
     contents: Embedded | Embedded[] | null;
@@ -89,6 +94,9 @@ export async function loadDashboard(businessId: string): Promise<DashboardData> 
     const c = Array.isArray(row.contents) ? row.contents[0] : row.contents;
     return {
       id: row.id,
+      contentId: row.content_id,
+      prompt: c?.prompt ?? "",
+      ready: Boolean(c?.post_text || c?.caption || c?.visual_url),
       platform: row.platform,
       scheduled_at: row.scheduled_at,
       text: snippet(c?.post_text || c?.caption || c?.prompt, 100),

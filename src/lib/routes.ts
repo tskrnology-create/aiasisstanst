@@ -21,7 +21,7 @@ function withQuery(path: string, params: Record<string, string | undefined>): st
 }
 
 /** Bağımsız üretim yapıları: her biri tek başına çalışır; "birlikte" metin + görseli tek akışta toplar. */
-export type StudioMode = "metin" | "gorsel" | "birlikte" | "video";
+export type StudioMode = "metin" | "gorsel" | "birlikte" | "video" | "yanit";
 
 export const STUDIO_HUB = "/studyo";
 
@@ -29,6 +29,7 @@ export const STUDIO_MODES: ReadonlyArray<{ id: StudioMode; label: string; hint: 
   { id: "metin", label: "Metin", hint: "Yalnızca yazı: yapay zekâyla yaz ya da kendi metnini ekle", href: "/studyo/metin" },
   { id: "gorsel", label: "Görsel", hint: "Üret, yükle ya da Pixabay'dan seç; şablona koy, istersen yazı ekle", href: "/studyo/gorsel" },
   { id: "birlikte", label: "Metin + Görsel", hint: "Metin, görsel ve plan tek akışta", href: "/studyo/birlikte" },
+  { id: "yanit", label: "Yanıtla", hint: "Yorum ve mesajlara marka sesiyle hızlı yanıt", href: "/studyo/yanit" },
   { id: "video", label: "Video", hint: "Görsel + metinle yapay zekâ videosu, kendi videon, senaryo", href: "/studyo/video" },
 ];
 

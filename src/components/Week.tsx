@@ -8,10 +8,13 @@ import { getSupabase } from "@/lib/supabase";
 import { loadDashboard, type DashboardData } from "@/lib/dashboard-data";
 import { weekStrip } from "@/lib/dashboard-utils";
 import { addDays, dayKey, startOfDay } from "@/lib/calendar-utils";
-import { contentsHref } from "@/lib/routes";
+import { modeHref } from "@/lib/routes";
+import { postApi } from "@/lib/api-client";
+import { PLAN_SLOTS, type PlanItem } from "@/lib/plan-prompt";
+import { businessStore } from "@/lib/business-store";
 import { useBusinessContext } from "./BusinessContext";
-import { Button, Callout, EmptyState, LinkButton, Tag, cx } from "./Ui";
-import { IconCheck, IconPlus } from "./Icons";
+import { Button, Callout, Chip, EmptyState, LinkButton, SectionCard, Tag, cx } from "./Ui";
+import { IconCheck, IconPlus, IconSparkles } from "./Icons";
 
 export default function Week() {
   const { activeBusinessId: businessId } = useBusinessContext();
@@ -46,6 +49,67 @@ export default function Week() {
   const items = (data?.upcoming ?? []).filter((i) => dayKey(new Date(i.scheduled_at)) === dayKey(day));
   const overdue = (data?.upcoming ?? []).filter((i) => new Date(i.scheduled_at) < startOfDay(now));
 
+  const [proposal, setProposal] = useState<PlanItem[] | null>(null);
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [perWeek, setPerWeek] = useState(5);
+  const [planning, setPlanning] = useState(false);
+  const [adding, setAdding] = useState(false);
+
+  async function propose() {
+    if (!businessId || planning) return;
+    setPlanning(true);
+    setError(null);
+    try {
+      const res = await postApi<{ items: PlanItem[] }>("/api/plan", { businessId, perWeek });
+      setProposal(res.items);
+      setPicked(new Set(res.items.map((_, i) => i)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Plan hazırlanamadı.");
+    } finally {
+      setPlanning(false);
+    }
+  }
+
+  async function addPlan() {
+    if (!businessId || !proposal || adding) return;
+    setAdding(true);
+    setError(null);
+    try {
+      const biz = await businessStore.get(businessId);
+      if (!biz) throw new Error("Marka bulunamadı.");
+      const sb = getSupabase();
+      for (const [i, item] of proposal.entries()) {
+        if (!picked.has(i)) continue;
+        const slot = PLAN_SLOTS[item.slot];
+        const at = new Date(now.getFullYear(), now.getMonth(), now.getDate() + item.day, slot.hour, slot.minute);
+        const content = await sb
+          .from("contents")
+          .insert({ business_id: businessId, prompt: `${item.title}: ${item.prompt}`.slice(0, 500), language: biz.content_language, status: "draft" })
+          .select("id")
+          .single();
+        if (content.error || !content.data) throw new Error("Plan kaydedilemedi.");
+        const cal = await sb.from("calendar_items").insert({
+          business_id: businessId,
+          content_id: content.data.id,
+          social_account_id: null,
+          platform: item.platform,
+          scheduled_at: at.toISOString(),
+          remind_at: new Date(at.getTime() - 60 * 60 * 1000).toISOString(),
+        });
+        if (cal.error) {
+          await sb.from("contents").delete().eq("id", content.data.id);
+          throw new Error("Plan kaydedilemedi.");
+        }
+      }
+      setProposal(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Plan kaydedilemedi.");
+    } finally {
+      setAdding(false);
+    }
+  }
+
   async function markDone(id: string) {
     const { error: err } = await getSupabase().from("calendar_items").update({ done: true }).eq("id", id);
     if (err) setError("İşaretlenemedi.");
@@ -64,6 +128,61 @@ export default function Week() {
       </header>
 
       {error && <Callout tone="error">{error}</Callout>}
+
+      {!proposal ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-brand/25 bg-brand-soft p-3.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-ink">Haftayı tek tıkla planla</p>
+            <p className="text-xs text-muted">Konuları dengeler, günlere dağıtır. Sonra her fikri tek dokunuşla yazdırırsın.</p>
+          </div>
+          <div className="flex items-center gap-1.5" role="group" aria-label="Haftalık paylaşım sayısı">
+            {[3, 5, 7].map((n) => (
+              <Chip key={n} active={perWeek === n} onClick={() => setPerWeek(n)}>{n}</Chip>
+            ))}
+          </div>
+          <Button type="button" size="sm" onClick={propose} disabled={planning}>
+            <IconSparkles className="h-4 w-4" />
+            {planning ? "Hazırlanıyor…" : "Planla"}
+          </Button>
+        </div>
+      ) : (
+        <SectionCard title="Önerilen hafta" description="İstemediğini çıkar, kalanı takvime ekle.">
+          <ul className="space-y-2">
+            {proposal.map((item, i) => (
+              <li key={i}>
+                <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-line bg-surface-2/60 p-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 accent-brand"
+                    checked={picked.has(i)}
+                    onChange={(e) =>
+                      setPicked((cur) => {
+                        const next = new Set(cur);
+                        if (e.target.checked) next.add(i);
+                        else next.delete(i);
+                        return next;
+                      })
+                    }
+                  />
+                  <span className="min-w-0 text-sm">
+                    <span className="block text-[11px] font-semibold text-muted">
+                      {addDays(startOfDay(now), item.day).toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "short" })} · {PLAN_SLOTS[item.slot].label} · {item.platform} · {item.pillar}
+                    </span>
+                    <span className="block font-semibold text-ink">{item.title}</span>
+                    <span className="block text-xs text-muted">{item.prompt}</span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 flex gap-2">
+            <Button type="button" onClick={addPlan} disabled={adding || picked.size === 0}>
+              {adding ? "Ekleniyor…" : `${picked.size} paylaşımı takvime ekle`}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setProposal(null)} disabled={adding}>Vazgeç</Button>
+          </div>
+        </SectionCard>
+      )}
 
       <div className="grid grid-cols-7 gap-1.5" role="tablist" aria-label="Günler">
         {strip.map((d, i) => (
@@ -97,14 +216,21 @@ export default function Week() {
               <span className="text-xs font-semibold text-muted">{time(item.scheduled_at)}</span>
               {item.platform && <Tag>{item.platform}</Tag>}
             </div>
-            <p className="mt-1.5 text-sm text-ink">{item.text || "İçerik"}</p>
+            <p className="mt-1.5 text-sm text-ink">{item.ready ? item.text : `Fikir: ${item.prompt}`}</p>
+            {!item.ready && <p className="mt-1 text-[11px] font-semibold text-warn">Henüz yazılmadı</p>}
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" onClick={() => markDone(item.id)}>
+              {!item.ready && (
+                <LinkButton
+                  size="sm"
+                  variant="primary"
+                  href={modeHref("metin", { prompt: item.prompt.slice(0, 500) }) + `&slot=${item.contentId}${item.platform ? `&platform=${item.platform}` : ""}`}
+                >
+                  <IconSparkles className="h-4 w-4" /> Hazırla
+                </LinkButton>
+              )}
+              <Button size="sm" variant="secondary" onClick={() => markDone(item.id)} disabled={!item.ready}>
                 <IconCheck className="h-4 w-4" /> Paylaşıldı
               </Button>
-              <LinkButton size="sm" variant="ghost" href={contentsHref({ view: "takvim" })}>
-                Takvimde aç
-              </LinkButton>
             </div>
           </article>
         ))}

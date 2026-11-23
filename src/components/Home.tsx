@@ -58,6 +58,14 @@ export default function Home() {
       )}
       {failed && <p role="alert" className="text-sm text-danger">Özet yüklenemedi.</p>}
 
+      <Link href="/hafta" className="flex items-center justify-between rounded-2xl bg-brand p-4 text-brand-ink shadow-pop transition hover:-translate-y-0.5">
+        <span>
+          <span className="block text-sm font-bold">Haftayı planla</span>
+          <span className="block text-xs opacity-90">Ne paylaşacağına bir daha takılma: fikirler günlere yerleşir.</span>
+        </span>
+        <IconArrowRight className="h-5 w-5" />
+      </Link>
+
       {next && (
         <Link
           href={next.href}

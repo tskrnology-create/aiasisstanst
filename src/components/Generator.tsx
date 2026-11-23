@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { TONES, type Tone } from "@/lib/tones";
-import { CONTENT_KINDS, PLATFORMS, type ContentKind, type PlatformId } from "@/lib/content-kinds";
+import { CONTENT_KINDS, PLATFORMS, isPlatformId, type ContentKind, type PlatformId } from "@/lib/content-kinds";
 import { postApi } from "@/lib/api-client";
 import type { ContentIdea } from "@/lib/brand-prompt";
 import { MANUAL_SHARE_NOTE } from "@/lib/share-links";
@@ -23,10 +23,11 @@ import { IconCalendar, IconImage, IconLayers, IconSparkles, IconWand } from "./I
 import { useBusinessContext } from "./BusinessContext";
 import { MusicCard, PostChecklist, PostPackageCard, type GenMeta, type GeneratedRow } from "./PackageView";
 import { contentsHref, modeHref, studioHref, type StudioMode } from "@/lib/routes";
-import { POST_FORMATS, formatsForPlatform, type PostFormat } from "@/lib/post-formats";
+import { POST_FORMATS, formatsForPlatform, isPostFormat, type PostFormat } from "@/lib/post-formats";
 
 
 const MAX_PROMPT_LEN = 500;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type BlockId = "post_text" | "caption" | "hashtags" | "ad_text" | "story_text";
 
@@ -173,8 +174,18 @@ function GeneratorWorkspace({ businessId, mode }: { businessId: string | null; m
   });
   const [tone, setTone] = useState<Tone | "">("");
   const [kind, setKind] = useState<ContentKind | "">("");
-  const [format, setFormat] = useState<PostFormat | "">("");
-  const [platform, setPlatform] = useState<PlatformId | "">("");
+  const [format, setFormat] = useState<PostFormat | "">(() => {
+    if (typeof window === "undefined") return "";
+    const f = new URLSearchParams(window.location.search).get("format");
+    return isPostFormat(f) ? f : "";
+  });
+  // Haftalık plandan gelindiyse (?slot=<yer tutucu içerik>) üretilen içerik o plan satırına bağlanır.
+  const slotId = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("slot");
+  const [platform, setPlatform] = useState<PlatformId | "">(() => {
+    if (typeof window === "undefined") return "";
+    const p = new URLSearchParams(window.location.search).get("platform");
+    return isPlatformId(p) ? p : "";
+  });
   const [ideas, setIdeas] = useState<ContentIdea[] | null>(null);
   const [ideasBusy, setIdeasBusy] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -217,6 +228,12 @@ function GeneratorWorkspace({ businessId, mode }: { businessId: string | null; m
       if (opts.parentId) {
         setAlternatives((a) => [row, ...a]);
       } else {
+        if (slotId && UUID_RE.test(slotId)) {
+          // Plan satırını yeni içeriğe bağla; yer tutucu içeriği sil (takvim kaydı önce taşınır).
+          const sb = getSupabase();
+          const moved = await sb.from("calendar_items").update({ content_id: row.id }).eq("content_id", slotId);
+          if (!moved.error) await sb.from("contents").delete().eq("id", slotId).is("post_text", null).is("visual_url", null);
+        }
         setMain(row);
         setMeta({ kind, platform, tone: opts.tone });
         setAlternatives([]);

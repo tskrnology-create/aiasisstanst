@@ -13,6 +13,7 @@ import { totalSeconds, type PostPackage } from "@/lib/post-formats";
 import { STUDIO_MODES, contentsHref, modeHref, type StudioMode } from "@/lib/routes";
 import { postApi, loadImage } from "@/lib/api-client";
 import { useBusinessContext } from "./BusinessContext";
+import { REPLY_GOALS, REPLY_SOURCES, type ReplyGoal, type ReplyOption, type ReplySource } from "@/lib/reply-prompt";
 import Generator from "./Generator";
 import VisualCreator from "./VisualCreator";
 import MediaPicker from "./MediaPicker";
@@ -21,7 +22,7 @@ import { Button, Callout, Chip, SectionCard, Tag, cx, hintClass, inputClass } fr
 import MusicPicker, { type MusicChoice } from "./MusicPicker";
 import { IconArrowLeft, IconImage, IconLibrary, IconVideo, IconClose } from "./Icons";
 
-const MODE_ICON: Record<StudioMode, string> = { metin: "Aa", gorsel: "▣", birlikte: "Aa▣", video: "▶" };
+const MODE_ICON: Record<StudioMode, string> = { metin: "Aa", gorsel: "▣", birlikte: "Aa▣", video: "▶", yanit: "💬" };
 
 export function StudioHub() {
   return (
@@ -556,6 +557,70 @@ export function VideoStudio() {
       {view === "ai" && <VideoAi />}
       {view === "kendi" && <VideoOwn />}
       {view === "senaryo" && (step === "klip" && contentId ? <VideoClips contentId={contentId} /> : <Generator mode="video" />)}
+    </div>
+  );
+}
+
+/** Yorum / DM yanıt asistanı: gelen mesajı yapıştır, marka sesiyle 3 yanıt al. */
+export function ReplyStudio() {
+  const { activeBusinessId } = useBusinessContext();
+  const [source, setSource] = useState<ReplySource>("yorum");
+  const [goal, setGoal] = useState<ReplyGoal>("tesekkur");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [replies, setReplies] = useState<ReplyOption[]>([]);
+
+  async function run() {
+    if (!activeBusinessId || busy || message.trim().length < 2) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await postApi<{ replies: ReplyOption[] }>("/api/reply", { businessId: activeBusinessId, message: message.trim(), source, goal });
+      setReplies(res.replies);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Yanıt hazırlanamadı.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <BackToHub label="Yanıtla" />
+      <SectionCard title="Gelen mesaj" description="Yanıtlamak istediğiniz yorumu ya da mesajı yapıştırın.">
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Mesaj türü">
+            {REPLY_SOURCES.map((s) => (
+              <Chip key={s.id} active={source === s.id} onClick={() => setSource(s.id)}>{s.label}</Chip>
+            ))}
+          </div>
+          <textarea className={cx(inputClass, "min-h-28 resize-y")} rows={4} maxLength={800} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Örn. Ekran değişimi kaç tl? Ne kadar sürer?" aria-label="Gelen mesaj" />
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Yanıt amacı">
+            {REPLY_GOALS.map((g) => (
+              <Chip key={g.id} active={goal === g.id} onClick={() => setGoal(g.id)}>{g.label}</Chip>
+            ))}
+          </div>
+          {error && <Callout tone="error">{error}</Callout>}
+          <Button type="button" onClick={run} disabled={busy || message.trim().length < 2 || !activeBusinessId}>
+            {busy ? "Hazırlanıyor…" : "Yanıt öner"}
+          </Button>
+        </div>
+      </SectionCard>
+      {replies.length > 0 && (
+        <ul className="space-y-2.5" aria-label="Yanıt seçenekleri">
+          {replies.map((r) => (
+            <li key={r.label + r.text} className="rounded-2xl border border-line bg-surface p-4 shadow-soft">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <Tag>{r.label}</Tag>
+                <CopyButton text={r.text} label="Kopyala" />
+              </div>
+              <p className="whitespace-pre-wrap text-sm text-ink">{r.text}</p>
+            </li>
+          ))}
+          <li className="text-[11px] text-faint">Yanıtı kopyalayıp ilgili platformda siz gönderirsiniz; fiyat ve tarih gibi ayrıntıları göndermeden önce kontrol edin.</li>
+        </ul>
+      )}
     </div>
   );
 }
