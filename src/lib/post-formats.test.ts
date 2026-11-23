@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildGenerateMessages } from "./brand-prompt";
-import { composeText, formatsForPlatform, packageToLegacy, parsePostPackage, recommendFormat, totalSeconds } from "./post-formats";
+import { sanitizePackage, composeText, formatsForPlatform, packageToLegacy, parsePostPackage, recommendFormat, totalSeconds } from "./post-formats";
 
 describe("post-formats", () => {
   it("platforma uygun format önerir", () => {
@@ -61,5 +61,26 @@ describe("post-formats", () => {
     expect(video).not.toContain('"slides"');
     const auto = buildGenerateMessages(profile, { userPrompt: "İpucu", kind: "ipucu", platform: "instagram" })[1].content;
     expect(auto).toContain('"slides"');
+  });
+});
+
+describe("sanitizePackage", () => {
+  it("kullanıcı düzenlemesini temizler: hashtag, boş slayt, saniye sınırı", () => {
+    const out = sanitizePackage({
+      format: "video",
+      hook: "  Merhaba  ",
+      body: "Gövde",
+      cta: "Ara",
+      hashtags: ["kampanya", "#kampanya", " ", "#x y"],
+      slides: [{ title: "", text: "" }],
+      scenes: [{ seconds: 99, visual: "a", on_screen_text: "", voiceover: "" }, { seconds: 3, visual: "", on_screen_text: "", voiceover: "" }],
+      visual_brief: "",
+      alt_text: "",
+    });
+    expect(out.hook).toBe("Merhaba");
+    expect(out.hashtags).toEqual(["#kampanya", "#xy"]);
+    expect(out.slides).toEqual([]);
+    expect(out.scenes).toHaveLength(1);
+    expect(out.scenes[0].seconds).toBe(15);
   });
 });

@@ -124,3 +124,7 @@ Bu sürümde bilinçli olarak kapsam dışında kalan veya canlıya çıkmadan �
 - `docs/platform-entegrasyon-plani.md`: platform API koşulları ve otomatik yayına geçiş planı
 - `docs/pixabay-integration-notes.md`: Pixabay API, 3D katalog ve lisans koşulları
 - `docs/social-workflow-research.md`: manuel yayın, platform kısıtları ve beş aracın resmî kaynaklarından ürün çıkarımları
+
+
+## Belgeler
+Geliştirme süreci, UML, mimari kararlar, tasarım ve test/yayın kuralları: [`docs/README.md`](docs/README.md).

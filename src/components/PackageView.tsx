@@ -5,9 +5,11 @@
 import type { ContentKind, PlatformId } from "@/lib/content-kinds";
 import { analyzePost } from "@/lib/platform-playbook";
 import { suggestMusic } from "@/lib/music-suggestions";
-import { POST_FORMATS, totalSeconds, type PostPackage } from "@/lib/post-formats";
+import { useState } from "react";
+import { getSupabase } from "@/lib/supabase";
+import { POST_FORMATS, packageToLegacy, sanitizePackage, totalSeconds, type PostPackage } from "@/lib/post-formats";
 import { contentsHref, studioHref } from "@/lib/routes";
-import { LinkButton, SectionCard, Tag, cx } from "./Ui";
+import { Button, LinkButton, SectionCard, Tag, cx } from "./Ui";
 import { CopyButton } from "./ShareControls";
 import { IconCalendar, IconImage } from "./Icons";
 
@@ -127,7 +129,7 @@ export interface NextStepLink {
 
 export function PostPackageCard({
   row,
-  pkg,
+  pkg: initialPkg,
   headline,
   nextStep,
   planHref,
@@ -140,10 +142,12 @@ export function PostPackageCard({
   /** undefined → birlikte akışının "Planla" adımı; null → bağlantı gösterilmez. */
   planHref?: string | null;
 }) {
+  const [pkg, setPkg] = useState(initialPkg);
+  const [editing, setEditing] = useState(false);
   const next = nextStep === undefined ? { href: studioHref({ step: "gorsel", contentId: row.id }), label: "Sonraki adım: Görsel" } : nextStep;
   const plan = planHref === undefined ? studioHref({ step: "planla", contentId: row.id }) : planHref;
   const format = POST_FORMATS.find((f) => f.id === pkg.format);
-  const shareAll = [row.post_text ?? "", pkg.hashtags.join(" ")].filter((x) => x.trim()).join("\n\n");
+  const shareAll = [packageToLegacy(pkg).post_text, pkg.hashtags.join(" ")].filter((x) => x.trim()).join("\n\n");
   return (
     <SectionCard
       title={headline ?? format?.label ?? "Paylaşım paketi"}
@@ -155,6 +159,17 @@ export function PostPackageCard({
         </div>
       }
     >
+      {editing ? (
+        <PackageEditor
+          rowId={row.id}
+          pkg={pkg}
+          onCancel={() => setEditing(false)}
+          onSaved={(next) => {
+            setPkg(next);
+            setEditing(false);
+          }}
+        />
+      ) : (
       <div className="space-y-4">
         <PackageBlock label="1 · Kanca" text={pkg.hook} />
         <PackageBlock label="2 · Gövde" text={pkg.body} />
@@ -212,8 +227,11 @@ export function PostPackageCard({
         <PackageBlock label="Alternatif metin (erişilebilirlik)" text={pkg.alt_text} />
 
         <div className="flex flex-wrap items-center gap-2">
-          <LinkButton href={contentsHref({ contentId: row.id })} variant="secondary" size="sm">
-            İçeriği düzenle
+          <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(true)}>
+            Düzenle
+          </Button>
+          <LinkButton href={contentsHref({ contentId: row.id })} variant="ghost" size="sm">
+            Kütüphanede aç
           </LinkButton>
           {next && (
             <LinkButton href={next.href} variant="primary" size="sm">
@@ -229,7 +247,97 @@ export function PostPackageCard({
           )}
         </div>
       </div>
+      )}
     </SectionCard>
+  );
+}
+
+function PackageEditor({ rowId, pkg, onCancel, onSaved }: { rowId: string; pkg: PostPackage; onCancel: () => void; onSaved: (next: PostPackage) => void }) {
+  const [draft, setDraft] = useState<PostPackage>(pkg);
+  const [tags, setTags] = useState(pkg.hashtags.join(" "));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function patch<K extends keyof PostPackage>(key: K, value: PostPackage[K]) {
+    setDraft((d) => ({ ...d, [key]: value }));
+  }
+
+  async function save() {
+    if (busy) return;
+    const clean = sanitizePackage({ ...draft, hashtags: tags.split(/[\s,]+/).filter(Boolean) });
+    if (!clean.hook && !clean.body) {
+      setError("Kanca ya da gövde metni boş olamaz.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const legacy = packageToLegacy(clean);
+    const { error: err } = await getSupabase().from("contents").update({ package: clean, ...legacy }).eq("id", rowId);
+    setBusy(false);
+    if (err) {
+      setError("Kaydedilemedi, tekrar deneyin.");
+      return;
+    }
+    onSaved(clean);
+  }
+
+  const field = "w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand";
+  const label = "block space-y-1 text-xs font-semibold text-muted";
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+      className="space-y-3"
+      aria-label="İçeriği düzenle"
+    >
+      <label className={label}>
+        Kanca
+        <input className={field} maxLength={150} value={draft.hook} onChange={(e) => patch("hook", e.target.value)} />
+      </label>
+      <label className={label}>
+        Gövde
+        <textarea className={cx(field, "min-h-28 resize-y")} rows={5} maxLength={2200} value={draft.body} onChange={(e) => patch("body", e.target.value)} />
+      </label>
+      <label className={label}>
+        Çağrı
+        <input className={field} maxLength={200} value={draft.cta} onChange={(e) => patch("cta", e.target.value)} />
+      </label>
+      <label className={label}>
+        Hashtag&apos;ler (boşlukla ayırın)
+        <input className={field} value={tags} onChange={(e) => setTags(e.target.value)} />
+      </label>
+      {draft.slides.length > 0 && (
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-semibold text-muted">{draft.format === "hikaye" ? "Hikâye kareleri" : "Slaytlar"}</legend>
+          {draft.slides.map((sl, i) => (
+            <div key={i} className="grid gap-2 rounded-xl border border-line p-2.5">
+              <input aria-label={`Slayt ${i + 1} başlık`} className={field} maxLength={60} value={sl.title} onChange={(e) => patch("slides", draft.slides.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} />
+              <textarea aria-label={`Slayt ${i + 1} metin`} className={cx(field, "resize-y")} rows={2} maxLength={220} value={sl.text} onChange={(e) => patch("slides", draft.slides.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} />
+            </div>
+          ))}
+        </fieldset>
+      )}
+      {draft.scenes.length > 0 && (
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-semibold text-muted">Sahneler</legend>
+          {draft.scenes.map((sc, i) => (
+            <div key={i} className="grid gap-2 rounded-xl border border-line p-2.5">
+              <input aria-label={`Sahne ${i + 1} görüntü`} className={field} maxLength={220} value={sc.visual} onChange={(e) => patch("scenes", draft.scenes.map((x, j) => (j === i ? { ...x, visual: e.target.value } : x)))} />
+              <input aria-label={`Sahne ${i + 1} ekran yazısı`} className={field} maxLength={100} value={sc.on_screen_text} onChange={(e) => patch("scenes", draft.scenes.map((x, j) => (j === i ? { ...x, on_screen_text: e.target.value } : x)))} />
+              <input aria-label={`Sahne ${i + 1} ses`} className={field} maxLength={220} value={sc.voiceover} onChange={(e) => patch("scenes", draft.scenes.map((x, j) => (j === i ? { ...x, voiceover: e.target.value } : x)))} />
+            </div>
+          ))}
+        </fieldset>
+      )}
+      {error && <p role="alert" className="text-xs text-danger">{error}</p>}
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={busy}>{busy ? "Kaydediliyor…" : "Kaydet"}</Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={busy}>Vazgeç</Button>
+      </div>
+    </form>
   );
 }
 

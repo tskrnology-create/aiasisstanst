@@ -176,3 +176,27 @@ export function packageToLegacy(pkg: PostPackage): { post_text: string; caption:
     story_text: parts.length ? parts.join("\n") : null,
   };
 }
+
+/** Kullanıcının elle düzenlediği paketi kaydetmeden önce temizler ve sınırlar. */
+export function sanitizePackage(pkg: PostPackage): PostPackage {
+  const hashtags = [...new Set(pkg.hashtags.map((t) => t.trim()).map((t) => t.replace(/\s+/g, "").replace(/^#*/, "#")).filter((t) => t.length > 1 && t.length <= 40))].slice(0, 30);
+  return {
+    format: pkg.format,
+    hook: str(pkg.hook, 150),
+    body: pkg.body.replace(/[ \t]+/g, " ").trim().slice(0, 2200),
+    cta: str(pkg.cta, 200),
+    hashtags,
+    slides: pkg.slides.map((s) => ({ title: str(s.title, 60), text: str(s.text, 220) })).filter((s) => s.title || s.text).slice(0, 10),
+    scenes: pkg.scenes
+      .map((s) => ({
+        seconds: Number.isFinite(s.seconds) ? Math.min(15, Math.max(1, Math.round(s.seconds))) : 3,
+        visual: str(s.visual, 220),
+        on_screen_text: str(s.on_screen_text, 100),
+        voiceover: str(s.voiceover, 220),
+      }))
+      .filter((s) => s.visual || s.on_screen_text || s.voiceover)
+      .slice(0, 8),
+    visual_brief: str(pkg.visual_brief, 400),
+    alt_text: str(pkg.alt_text, 300),
+  };
+}
