@@ -2,6 +2,8 @@
 
 Diyagramlar Mermaid ile yazıldı (GitHub'da doğrudan görünür). Kod değiştikçe bu dosya güncellenir: **bir akış/tablo değişen PR, ilgili diyagramı da değiştirir.**
 
+> Ayrıntılı içerik hazırlama ve manuel yayın akışı (PlantUML): [`content-lifecycle.puml`](content-lifecycle.puml). Birlikte yapısının adımları: **Yaz → Düzenle → Görsel → Planla**.
+
 ## 2.1 Kullanım durumu diyagramı (Use Case)
 
 Mermaid'de yerleşik use-case türü olmadığından aktörler yuvarlak, kullanım durumları oval kutu olarak çizilir.

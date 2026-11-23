@@ -22,7 +22,7 @@ Küçük işletmeler ve bireysel içerik üreticileri sosyal medyayı **düzenli
 | US-3 | Must | Haftayı tek tıkla planlamak istiyorum | 3/5/7 paylaşımlık öneri gelir; seçilenler takvime yer tutucu olarak eklenir |
 | US-4 | Must | Plandaki fikirden yazı hazırlamak istiyorum | "Hazırla" Stüdyo'yu fikir+platform dolu açar; üretilen içerik plan satırına bağlanır |
 | US-5 | Must | Metni yapay zekâ yazsın **ya da** ben yazayım | İki yol da kütüphaneye taslak olarak düşer |
-| US-6 | Must | Oluşan içeriği düzenleyebilmeliyim | Kanca/gövde/çağrı/hashtag/slayt/sahne düzenlenip kaydedilir; kütüphanede metin alanları düzenlenir |
+| US-6 | Must | Oluşan içeriği düzenleyebilmeliyim | Üretim kartında kanca/gövde/çağrı/hashtag/slayt/sahne düzenlenip aynı kayda kaydedilir; kendi metni de aynı kayıt üzerinden güncellenir; Birlikte akışında «Düzenle» adımı vardır |
 | US-7 | Must | Platforma uygun format ve kurallarla içerik istiyorum | Format ve platform seçimine göre paket (gönderi/karusel/hikâye/video/metin); kontrol listesi gösterilir |
 | US-8 | Should | Görseli üretmek/yüklemek/Pixabay'dan seçmek ve şablona koymak istiyorum | Şablon önizlemesi; PNG kütüphaneye özel depoya kaydedilir; yazı isteğe bağlı |
 | US-9 | Should | Video için görsel+metin vererek video üretmek veya kendi videomu yüklemek istiyorum | En az 3 görsel+metin doğrulanır (üretim servisi bağlanınca çalışır); MP4/WebM yükleme ve önizleme çalışır |
