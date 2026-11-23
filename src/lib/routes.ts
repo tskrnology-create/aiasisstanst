@@ -1,10 +1,11 @@
 // Uygulamadaki tüm iç bağlantılar tek yerden üretilir; rota adları değişirse yalnızca burası güncellenir.
 
-export type StudioStep = "yaz" | "gorsel" | "planla";
+export type StudioStep = "yaz" | "onayla" | "gorsel" | "planla";
 export type ContentsView = "liste" | "takvim";
 
 export const STUDIO_STEPS: ReadonlyArray<{ id: StudioStep; label: string; hint: string }> = [
-  { id: "yaz", label: "Yaz", hint: "Fikri metne dönüştür" },
+  { id: "yaz", label: "Yaz", hint: "Kendin yaz veya AI kullan" },
+  { id: "onayla", label: "Düzenle", hint: "Gözden geçir ve onayla" },
   { id: "gorsel", label: "Görsel", hint: "Marka görselini hazırla" },
   { id: "planla", label: "Planla", hint: "Paylaşım gününü seç" },
 ];

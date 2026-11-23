@@ -13,6 +13,7 @@ import { useBusinessContext } from "./BusinessContext";
 import Generator from "./Generator";
 import VisualCreator from "./VisualCreator";
 import Calendar from "./Calendar";
+import Library from "./Library";
 import { cx } from "./Ui";
 
 function ActiveContentBar({ contentId, step }: { contentId: string; step: StudioStep }) {
@@ -45,10 +46,10 @@ function ActiveContentBar({ contentId, step }: { contentId: string; step: Studio
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">Çalışılan içerik</p>
         <p className="truncate text-sm text-ink">{text === null ? "Yükleniyor…" : text || "İçerik bulunamadı"}</p>
       </div>
-      <div className="flex gap-2 text-xs font-semibold">
-        {step !== "yaz" && (
-          <Link href={studioHref({ step: "yaz", contentId })} className="text-muted hover:text-ink">
-            Metni gör
+      <div className="flex flex-wrap gap-3 text-xs font-semibold">
+        {step !== "onayla" && (
+          <Link href={studioHref({ step: "onayla", contentId })} className="text-brand hover:underline dark:text-brand-strong">
+            Düzenle / onayla
           </Link>
         )}
         <Link href={studioHref()} className="text-brand hover:underline dark:text-brand-strong">
@@ -64,16 +65,13 @@ export default function Studio() {
   const rawStep = params.get("adim");
   const step: StudioStep = isStudioStep(rawStep) ? rawStep : "yaz";
   const contentId = params.get("content") ?? "";
-  const stepIndex = STUDIO_STEPS.findIndex((s) => s.id === step);
-
   return (
     <div className="space-y-5">
       <nav aria-label="Stüdyo adımları">
-        <ol className="grid grid-cols-3 gap-2">
+        <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {STUDIO_STEPS.map((s, i) => {
             const active = s.id === step;
-            const done = i < stepIndex;
-            // Görsel ve plan adımları bir içerik gerektirir; yokken Yaz adımına dönülür.
+            // İçeriğe bağlı adımlar, bir içerik kaydı oluşturulana kadar pasiftir.
             const href = studioHref({ step: s.id, contentId: contentId || undefined });
             const locked = s.id !== "yaz" && !contentId;
             const body = (
@@ -81,10 +79,10 @@ export default function Studio() {
                 <span
                   className={cx(
                     "grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold",
-                    active ? "bg-brand text-white" : done ? "bg-ok text-white" : "bg-surface-2 text-muted"
+                    active ? "bg-brand text-white" : "bg-surface-2 text-muted"
                   )}
                 >
-                  {done ? "✓" : i + 1}
+                  {i + 1}
                 </span>
                 <span className="min-w-0 text-left">
                   <span className="block truncate text-sm font-semibold text-ink">{s.label}</span>
@@ -123,6 +121,7 @@ export default function Studio() {
       {contentId && <ActiveContentBar contentId={contentId} step={step} />}
 
       {step === "yaz" && <Generator />}
+      {step === "onayla" && <Library />}
       {step === "gorsel" && <VisualCreator />}
       {step === "planla" && <Calendar />}
     </div>

@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { loadDashboard, type DashboardData } from "@/lib/dashboard-data";
 import { greeting, nextAction, weekStrip } from "@/lib/dashboard-utils";
 import { upcomingSpecialDays } from "@/lib/special-days";
-import { modeHref } from "@/lib/routes";
+import { contentsHref, modeHref } from "@/lib/routes";
 import { useBusinessContext } from "./BusinessContext";
 import { IconArrowRight } from "./Icons";
 import { cx } from "./Ui";
@@ -73,14 +73,6 @@ export default function Home() {
         </div>
       )}
 
-      <Link href="/hafta" className="flex items-center justify-between rounded-2xl bg-brand p-4 text-brand-ink shadow-pop transition hover:-translate-y-0.5">
-        <span>
-          <span className="block text-sm font-bold">Haftayı planla</span>
-          <span className="block text-xs opacity-90">Ne paylaşacağına bir daha takılma: fikirler günlere yerleşir.</span>
-        </span>
-        <IconArrowRight className="h-5 w-5" />
-      </Link>
-
       {next && (
         <Link
           href={next.href}
@@ -106,8 +98,9 @@ export default function Home() {
           <span className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-brand">Paylaşım hazırla <IconArrowRight className="h-4 w-4" /></span>
         </Link>
         <details className="rounded-2xl border border-line bg-surface px-4 py-3">
-          <summary className="cursor-pointer text-sm font-semibold text-ink">Sadece tek bir iş yap</summary>
+          <summary className="cursor-pointer text-sm font-semibold text-ink">Diğer araçlar ve hızlı işler</summary>
           <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/hafta" className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink">Haftalık fikir planı</Link>
             <Link href={modeHref("metin")} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink">Yalnız metin</Link>
             <Link href={modeHref("gorsel")} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink">Yalnız görsel</Link>
             <Link href={modeHref("video", { step: "kendi" })} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink">Hazır videomu ekle</Link>
@@ -118,11 +111,11 @@ export default function Home() {
       <section aria-label="Bu hafta" className="space-y-2.5">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-ink">Bu hafta</h2>
-          <Link href="/hafta" className="text-xs font-semibold text-brand">Haftam →</Link>
+          <Link href={contentsHref({ view: "takvim" })} className="text-xs font-semibold text-brand">Takvim →</Link>
         </div>
         <div className="grid grid-cols-7 gap-1.5">
           {strip.map((d) => (
-            <Link key={d.key} href="/hafta" className="flex flex-col items-center gap-1 rounded-2xl border border-line bg-surface py-2 text-[11px] text-muted">
+            <Link key={d.key} href={contentsHref({ view: "takvim" })} className="flex flex-col items-center gap-1 rounded-2xl border border-line bg-surface py-2 text-[11px] text-muted">
               <span className="font-semibold capitalize">{d.isToday ? "Bugün" : d.label}</span>
               <span className={cx("grid h-6 w-6 place-items-center rounded-full text-[11px] font-bold", d.count ? "bg-brand-soft text-brand" : "bg-surface-2 text-faint")}>{d.count}</span>
             </Link>

@@ -88,7 +88,10 @@ function ResultCard({ row, headline, mode }: { row: GeneratedRow; headline?: str
             headline={headline}
             nextStep={null}
           />
-          <LinkButton href={textEditHref} variant="secondary" size="sm">Metni stüdyoda düzenle</LinkButton>
+          <div className="flex flex-wrap gap-2">
+            <LinkButton href={textEditHref} variant="secondary" size="sm">Metni stüdyoda düzenle</LinkButton>
+            <LinkButton href={studioHref({ step: "onayla", contentId: row.id })} variant="soft" size="sm">Gözden geçir / onayla</LinkButton>
+          </div>
         </div>
       );
     }
@@ -102,14 +105,20 @@ function ResultCard({ row, headline, mode }: { row: GeneratedRow; headline?: str
             nextStep={{ href: modeHref("video", { step: "klip", contentId: row.id }), label: "Sonraki adım: Klipler" }}
             planHref={null}
           />
-          <LinkButton href={textEditHref} variant="secondary" size="sm">Metni stüdyoda düzenle</LinkButton>
+          <div className="flex flex-wrap gap-2">
+            <LinkButton href={textEditHref} variant="secondary" size="sm">Metni stüdyoda düzenle</LinkButton>
+            <LinkButton href={studioHref({ step: "onayla", contentId: row.id })} variant="soft" size="sm">Gözden geçir / onayla</LinkButton>
+          </div>
         </div>
       );
     }
     return (
       <div className="space-y-3">
         <PostPackageCard row={row} pkg={row.package} headline={headline} />
-        <LinkButton href={textEditHref} variant="secondary" size="sm">Metni stüdyoda düzenle</LinkButton>
+        <div className="flex flex-wrap gap-2">
+          <LinkButton href={textEditHref} variant="secondary" size="sm">Metni stüdyoda düzenle</LinkButton>
+          <LinkButton href={studioHref({ step: "onayla", contentId: row.id })} variant="soft" size="sm">Gözden geçir / onayla</LinkButton>
+        </div>
       </div>
     );
   }
@@ -152,8 +161,8 @@ function LegacyResultCard({ row, headline, textEditHref }: { row: GeneratedRow; 
           )}
           <div className="flex flex-wrap items-center gap-2">
             <CopyButton text={value} label={`${block.label} metnini kopyala`} />
-            <LinkButton href={contentsHref({ contentId: row.id })} variant="secondary" size="sm">
-              İçeriği düzenle
+            <LinkButton href={studioHref({ step: "onayla", contentId: row.id })} variant="secondary" size="sm">
+              Gözden geçir / onayla
             </LinkButton>
             <LinkButton href={textEditHref} variant="soft" size="sm">
               Metni stüdyoda düzenle

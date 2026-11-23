@@ -13,7 +13,6 @@ import { cx, selectClass } from "./Ui";
 import AssistantBubble from "./AssistantBubble";
 import {
   IconBuilding,
-  IconCalendar,
   IconHome,
   IconLibrary,
   IconLogout,
@@ -24,8 +23,7 @@ import {
 
 const NAV = [
   { href: "/", label: "Ana sayfa", short: "Ana", icon: IconHome, description: "Bugünün özeti", match: ["/"] },
-  { href: "/studyo", label: "Stüdyo", short: "Stüdyo", icon: IconSparkles, description: "Metin, görsel, video", match: ["/studyo"] },
-  { href: "/hafta", label: "Hafta", short: "Hafta", icon: IconCalendar, description: "Bu haftanın planı", match: ["/hafta"] },
+  { href: "/studyo", label: "Stüdyo", short: "Stüdyo", icon: IconSparkles, description: "Yaz, düzenle, planla", match: ["/studyo"] },
   { href: "/icerikler", label: "İçerikler", short: "İçerik", icon: IconLibrary, description: "Liste ve takvim", match: ["/icerikler"] },
   { href: "/marka", label: "Marka", short: "Marka", icon: IconBuilding, description: "Profil, renk, logo", match: ["/marka"] },
 ] as const;
@@ -142,9 +140,9 @@ function BusinessSelector({ compact = false }: { compact?: boolean }) {
   }
   if (isBusinessLoading) {
     return <p className="px-1 text-xs text-muted">Markalar yükleniyor…</p>;
-    }
-    if (businesses.length === 0) {
-      return (
+  }
+  if (businesses.length === 0) {
+    return (
       <Link href="/marka" className="inline-flex rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand-soft dark:text-brand-strong">
         İlk markanı oluştur →
       </Link>

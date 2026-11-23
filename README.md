@@ -4,14 +4,21 @@ KOBİ'lerin ve markaların sosyal medya içeriklerini tek bir çalışma alanın
 
 > **Ürün kapsamı:** Bu sürüm içerik üretimi ve planlamayı destekler; Instagram, TikTok veya diğer platformlara otomatik gönderi yayımlamaz. Profilde sosyal hesaplar hedef seçmek ve manuel paylaşımı kaydetmek için tutulur; OAuth/platform API bağlantısı yoktur.
 
+## Kanonik kullanıcı akışı
+
+Bu akış uygulama gezinmesinin ve ana eylemlerin kaynağıdır: [UML aktivite diyagramı kaynağı](docs/content-lifecycle.puml).
+
+![Markadan içerik üretme, gözden geçirme, medya ekleme, takvimleme ve manuel yayın akışı](docs/content-lifecycle.png)
+
 ## Mevcut özellikler
 
 | Alan | Uygulama | Durum ve sınırlar |
 |---|---|---|
 | İşletme paneli | `/` | Aktif markanın taslak/onaylı içerik sayılarını, yaklaşan ve gecikmiş manuel paylaşım planlarını ve son içerikleri gerçek kayıtlardan gösterir; sosyal performans verisi uydurmaz. |
 | İşletme / marka profili | `/marka` (`/profil` eski bağlantısı yönlenir) | Bir hesapta birden fazla marka, kullanıcıya özel aktif marka seçimi, marka bilgileri ve sosyal hesaplar; ana/yardımcı renk dengesini iki ucu renklerle işaretlenmiş slider belirler ve profilde saklanır. Sosyal hesap kayıtları platform bağlantısı değildir. |
-| İçerik üretimi (Stüdyo · Yaz) | `/studyo` | Kullanıcı yapay zekâ ile içerik üretebilir veya kendi metnini sıfırdan yazıp taslak kaydedebilir. AI metinleri aynı içerik kaydı korunarak Stüdyo metin düzenleyicisinde ya da kütüphanede düzenlenebilir; gönderi metni ve hashtag değişikliği yeni kopya oluşturmaz. Gemini → DeepSeek → OpenAI yedek sırası. |
-| Görsel oluşturma (Stüdyo · Görsel) | `/studyo?adim=gorsel&content=<id>` | Üç adımlı içerik/tasarım/arka plan akışı; marka renkleri/logo ve oran slider'ı, şablon galerisi, metin düzenleme ve canlı önizleme; Pixabay fotoğraf/video araması; seçilen fotoğraf, video posteri veya GLB model karesi arka plan olurken medya özel depoya ve kütüphaneye kaydedilir; PNG indirme veya özel depoda çıktı kaydı. |
+| İçerik üretimi (Stüdyo · Yaz) | `/studyo/metin` | Kullanıcı yapay zekâ ile içerik üretebilir veya kendi metnini sıfırdan yazıp taslak kaydedebilir. AI metinleri aynı içerik kaydı korunarak Stüdyo metin düzenleyicisinde ya da kütüphanede gözden geçirilip düzenlenebilir/onaylanabilir; gönderi metni ve hashtag değişikliği yeni kopya oluşturmaz. Gemini → DeepSeek → OpenAI yedek sırası. |
+| Uçtan uca içerik hazırlama (önerilen yol) | `/studyo/birlikte` | URL'de içerik kimliğini koruyan Yaz → düzenle/onayla → isteğe bağlı Görsel/medya → Planla akışı. |
+| Görsel oluşturma (Stüdyo · Görsel) | `/studyo/gorsel?content=<id>` | Üç adımlı içerik/tasarım/arka plan akışı; marka renkleri/logo ve oran slider'ı, şablon galerisi, metin düzenleme ve canlı önizleme; Pixabay fotoğraf/video araması; seçilen fotoğraf, video posteri veya GLB model karesi arka plan olurken medya özel depoya ve kütüphaneye kaydedilir; PNG indirme veya özel depoda çıktı kaydı. |
 | İçerik takvimi (İçerikler · Takvim; Stüdyo · Planla) | `/icerikler?gorunum=takvim` | Ay/hafta görünümü, kayıtlı sosyal hesap seçimi, hatırlatma zamanı, saat değiştirme ve manuel “paylaşıldı” günlüğü (`posted_at`, isteğe bağlı `post_url`). Hatırlatma yalnızca uygulama içindedir; e-posta/push bildirimi yoktur. |
 | İçerik kütüphanesi (İçerikler · Liste) | `/icerikler` | Arama, durum filtresi, düzenleme, onay/taslak, metin indirme; özel saklanan görsel, MP4/WebM video ve 3D modelleri görüntüleme/oynatma, silme ve içeriği yeniden kullanma. |
 | Hesap ve veri erişimi | Supabase Auth + RLS | E-posta/şifre oturumu, aktif `business_id` filtreleri ve işletme sahibine göre satır düzeyinde erişim politikaları; üretim API'leri marka sahipliğini ayrıca doğrular. |

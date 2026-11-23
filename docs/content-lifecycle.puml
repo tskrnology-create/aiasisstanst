@@ -1,0 +1,68 @@
+@startuml
+title Aı Asisst — içerik hazırlama ve manuel yayın akışı
+skinparam backgroundColor #F7F8FA
+skinparam activity {
+  BackgroundColor #FFFFFF
+  BorderColor #8A94A6
+  FontColor #202633
+  DiamondBackgroundColor #FFF4D6
+  DiamondBorderColor #D8A842
+  StartColor #23866B
+  EndColor #C15C58
+}
+skinparam ArrowColor #667085
+skinparam shadowing false
+
+start
+if (Aktif marka seçili mi?) then (Evet)
+else (Hayır)
+  :Marka oluştur veya mevcut markayı seç;
+endif
+
+:İçerik amacını ve hedef platformu belirle;
+if (Metni kim hazırlıyor?) then (Kullanıcı)
+  :Kendi metnini yaz;
+else (Yapay zekâ)
+  :Brief yaz ve marka bağlamıyla taslak üret;
+endif
+:İçeriği taslak olarak kaydet;
+
+if (Düzenleme gerekiyor mu?) then (Evet)
+  :Metni ve hashtag'leri düzenle;
+  :Aynı içerik kaydını güncelle;
+else (Hayır)
+endif
+:Kütüphanede gözden geçir;
+if (Onaylamak istiyor mu?) then (Evet)
+  :İçeriği onayla;
+else (Taslak kalsın)
+endif
+
+if (Görsel veya medya gerekli mi?) then (Evet)
+  :Stüdyo'da görsel/medya hazırla;
+  note right
+    Üretilen/yüklenen medya aynı içerik kaydına bağlanır.
+    Pixabay fotoğraf/video, kullanıcı videosu ve GLB/3B korunur.
+    Marka renk dengesi slider ile belirlenir.
+  end note
+else (Hayır)
+endif
+
+if (Takvime eklenecek mi?) then (Evet)
+  :İçeriği, hesabı ve yayın zamanını takvimde seç;
+  :Plan kaydı oluştur;
+  note right
+    Planlama hatırlatmadır; uygulama otomatik yayımlamaz.
+  end note
+  :Zamanı geldiğinde metni kopyala,
+  medyayı indir ve platformu aç;
+  :Kullanıcı sosyal platformda manuel paylaşır;
+  :Takvimde paylaşıldı olarak kaydet;
+  :İsteğe bağlı yayın bağlantısını ekle;
+else (Hayır)
+  :İçerik taslak olarak kalır;
+endif
+
+:Kütüphaneden içeriği düzenle veya yeniden kullan;
+stop
+@enduml

@@ -30,6 +30,9 @@
 
 ## Bu çalışma kapsamında teslim edilen ürün çıktıları
 
+### Ana akış ve UML uyumu
+- [x] Kanonik içerik akışı `docs/content-lifecycle.puml` UML aktivite diyagramında tanımlıdır: marka → AI/kullanıcı metni → aynı kaydı düzenleme ve kütüphanede gözden geçirme/onay → isteğe bağlı medya → takvim → kullanıcı tarafından manuel paylaşım ve kayıt → yeniden kullanım. Ana gezinme ve ana sayfa eylemleri bu sırayı öne çıkarır; haftalık öneri ikincil araçtır.
+
 ### İşletme ana ekranı, içerik akışı ve marka ayarları
 - [x] `/` kullanıcı için seçili markanın iş özeti olur; sıradaki ve gecikmiş manuel yayın planlarını, taslak/onaylı içerik sayılarını ve yakın tarihli içeriği veritabanındaki gerçek kayıtlarından gösterir; takip edilmeyen sosyal erişim/performans metriği uydurmaz.
 - [x] Marka oluşturma ve profil düzenleme `/marka` alanında kalır; gezinme, aktif marka seçimi, ilk marka oluşturma bağlantıları, sayfa başlığı ve no-brand durumları yeni rota ile tutarlı çalışır. Eski `/profil` adresi geriye dönük uyumluluk için `/marka`'ya yönlendirilir.

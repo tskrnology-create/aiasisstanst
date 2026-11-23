@@ -11,7 +11,7 @@ export default function StudioPage() {
       <PageHeader
         eyebrow="Stüdyo"
         title="Metin + Görsel"
-        description="Metni, görseli ve paylaşım gününü tek akışta hazırlayın. Paylaşım sosyal platformda sizin tarafınızdan yapılır."
+        description="Metni yazın, gözden geçirip onaylayın; isterseniz medya ekleyin ve takvime alın. Paylaşımı sosyal platformda siz yaparsınız."
       />
       <AuthGate>
         <Suspense fallback={null}>

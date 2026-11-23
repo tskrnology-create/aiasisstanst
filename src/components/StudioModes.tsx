@@ -10,7 +10,7 @@ import { getSupabase } from "@/lib/supabase";
 import { businessStore, type StoredBusiness } from "@/lib/business-store";
 import { suggestMusic } from "@/lib/music-suggestions";
 import { totalSeconds, type PostPackage } from "@/lib/post-formats";
-import { STUDIO_MODES, contentsHref, modeHref, type StudioMode } from "@/lib/routes";
+import { STUDIO_MODES, contentsHref, modeHref, studioHref, type StudioMode } from "@/lib/routes";
 import { postApi } from "@/lib/api-client";
 import { useBusinessContext } from "./BusinessContext";
 import { REPLY_GOALS, REPLY_SOURCES, type ReplyGoal, type ReplyOption, type ReplySource } from "@/lib/reply-prompt";
@@ -200,7 +200,7 @@ function OwnText({ contentId }: { contentId: string | null }) {
         </label>
         {msg && (
           <Callout tone={msg.ok ? "success" : "error"}>
-            {msg.text} {msg.ok && savedId && <Link href={contentsHref({ contentId: savedId })} className="font-semibold underline">Bu içeriği aç →</Link>}
+            {msg.text} {msg.ok && savedId && <Link href={studioHref({ step: "onayla", contentId: savedId })} className="font-semibold underline">Gözden geçir / onayla →</Link>}
           </Callout>
         )}
         <Button type="button" onClick={save} disabled={busy || loadingContent || Boolean(loadError) || !activeBusinessId}>
