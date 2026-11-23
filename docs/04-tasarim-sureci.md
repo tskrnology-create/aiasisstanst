@@ -9,14 +9,17 @@
 6. **Doğrulama:** her değişiklikte telefon boyutunda ekran görüntüsü + Playwright akış testi; erişilebilirlik kontrol listesi.
 
 ## 4.2 Bilgi mimarisi
+Dört sekme; her biri tek soruya cevap verir.
+
 | Sekme | Soru | İçerik |
 |---|---|---|
-| Ana sayfa | "Bugün ne yapmalıyım?" | Haftayı planla, sıradaki adım, hafta şeridi, özel günler |
-| Stüdyo | "Ne hazırlayacağım?" | Metin · Görsel · Metin+Görsel · Video · Yanıtla |
-| Hafta | "Bu hafta ne var?" | Planlama, günlük liste, Hazırla / Paylaşıldı |
-| İçerikler | "Ne üretmiştim?" | Liste, takvim, düzenleme |
+| Ana sayfa | "Bugün ve bu hafta ne var?" | Haftayı planla, sıradaki adım, hafta şeridi (→ Hafta ayrıntısı), özel günler |
+| Oluştur | "Ne paylaşacağım?" | **Tek ekran:** tür + fikir → Instagram tarzı önizleme (yazı + otomatik markalı kapak) → düzenle → paylaş / planla; müzik isteğe bağlı |
+| İçerikler | "Ne üretmiştim?" | Liste, takvim, onay, düzenleme |
 | Marka | "Ben kimim?" | Profil, renk, logo, hesaplar |
 | (Balon) Asistan | "Bir şey sorabilir miyim?" | Marka profilini bilen sohbet |
+
+Gelişmiş araçlar (Metin / Görsel / Video / Yanıtla stüdyoları, Pixabay) menüde değil, Oluştur içinden «Gelişmiş stüdyo» ve «Pixabay ve daha fazlası» bağlantılarıyla açılır.
 
 İlke: **her ekranda tek birincil eylem**; seçenek sayısı azaltılır, ileri ayarlar gizlenir.
 

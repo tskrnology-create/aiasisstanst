@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { loadDashboard, type DashboardData } from "@/lib/dashboard-data";
 import { greeting, nextAction, weekStrip } from "@/lib/dashboard-utils";
 import { upcomingSpecialDays } from "@/lib/special-days";
-import { contentsHref, modeHref } from "@/lib/routes";
+import { contentsHref } from "@/lib/routes";
 import { useBusinessContext } from "./BusinessContext";
 import { IconArrowRight } from "./Icons";
 import { cx } from "./Ui";
@@ -87,26 +87,13 @@ export default function Home() {
         </Link>
       )}
 
-      <section aria-label="Stüdyo" className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-ink">Bir sonraki paylaşım</h2>
-          <Link href="/studyo" className="text-xs font-semibold text-brand">Stüdyo →</Link>
-        </div>
-        <Link href="/studyo/birlikte" className="block rounded-3xl border border-brand/25 bg-brand-soft p-5 transition hover:border-brand">
-          <span className="text-base font-bold text-ink">Fikirden paylaşım planına ilerle</span>
-          <span className="mt-1 block text-sm leading-relaxed text-muted">Metni hazırla, gerekirse görsel ekle, hesabı ve tarihi seç. Son paylaşımı sosyal platformda sen yaparsın.</span>
-          <span className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-brand">Paylaşım hazırla <IconArrowRight className="h-4 w-4" /></span>
-        </Link>
-        <details className="rounded-2xl border border-line bg-surface px-4 py-3">
-          <summary className="cursor-pointer text-sm font-semibold text-ink">Diğer araçlar ve hızlı işler</summary>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link href="/hafta" className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink">Haftalık fikir planı</Link>
-            <Link href={modeHref("metin")} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink">Yalnız metin</Link>
-            <Link href={modeHref("gorsel")} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink">Yalnız görsel</Link>
-            <Link href={modeHref("video", { step: "kendi" })} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink">Hazır videomu ekle</Link>
-          </div>
-        </details>
-      </section>
+      <Link href="/olustur" className="flex items-center justify-between rounded-2xl border border-line bg-surface p-4 shadow-soft transition hover:border-brand">
+        <span>
+          <span className="block text-sm font-bold text-ink">Şimdi bir şey oluştur</span>
+          <span className="block text-xs text-muted">Fikrini yaz; yazı ve kapak görseli birlikte hazırlansın.</span>
+        </span>
+        <IconArrowRight className="h-5 w-5 text-brand" />
+      </Link>
 
       <section aria-label="Bu hafta" className="space-y-2.5">
         <div className="flex items-center justify-between">
@@ -129,7 +116,7 @@ export default function Home() {
           <ul className="space-y-1.5">
             {specialDays.map((d) => (
               <li key={d.name}>
-                <Link href={modeHref("metin", { prompt: d.prompt })} className="flex items-center justify-between rounded-2xl border border-line bg-surface px-3.5 py-2.5 text-sm transition hover:border-brand">
+                <Link href={`/olustur?prompt=${encodeURIComponent(d.prompt.slice(0, 500))}`} className="flex items-center justify-between rounded-2xl border border-line bg-surface px-3.5 py-2.5 text-sm transition hover:border-brand">
                   <span className="font-medium text-ink">{d.name}</span>
                   <span className="text-xs text-muted">{d.daysAway === 0 ? "bugün" : `${d.daysAway} gün`} · yaz →</span>
                 </Link>

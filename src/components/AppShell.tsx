@@ -22,14 +22,14 @@ import {
 } from "./Icons";
 
 const NAV = [
-  { href: "/", label: "Ana sayfa", short: "Ana", icon: IconHome, description: "Bugünün özeti", match: ["/"] },
-  { href: "/studyo", label: "Stüdyo", short: "Stüdyo", icon: IconSparkles, description: "Yaz, düzenle, planla", match: ["/studyo"] },
+  { href: "/", label: "Ana sayfa", short: "Ana", icon: IconHome, description: "Bugünün özeti ve haftan", match: ["/", "/hafta"] },
+  { href: "/olustur", label: "Oluştur", short: "Oluştur", icon: IconSparkles, description: "Yaz, kapak yap, paylaş", match: ["/olustur", "/studyo"] },
   { href: "/icerikler", label: "İçerikler", short: "İçerik", icon: IconLibrary, description: "Liste ve takvim", match: ["/icerikler"] },
   { href: "/marka", label: "Marka", short: "Marka", icon: IconBuilding, description: "Profil, renk, logo", match: ["/marka"] },
 ] as const;
 
 function isActive(item: (typeof NAV)[number], pathname: string): boolean {
-  return (item.match as readonly string[]).includes(pathname) || (item.href === "/studyo" && pathname.startsWith("/studyo"));
+  return (item.match as readonly string[]).includes(pathname) || (item.href === "/olustur" && pathname.startsWith("/studyo"));
 }
 
 const THEME_KEY = "ai-asisst-theme";

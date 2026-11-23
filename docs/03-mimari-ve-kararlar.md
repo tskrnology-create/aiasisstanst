@@ -26,6 +26,7 @@
 | 7 | Büyük dosyalar (video) istemciden doğrudan özel Storage'a | Vercel gövde sınırı (~4.5 MB) | Doğrulama istemcide + RLS'li depo ilkeleri |
 | 8 | AI video üretimi arka uçta sağlayıcı arayüzüyle, şimdilik kapalı | Sağlayıcı seçimi sürüyor | Arayüz hazır; bağlanınca yalnızca `dispatch` dolar |
 | 9 | Canva şablonları kullanılmaz; kendi Canva-tarzı şablon seti | Canva şablonlarına programatik erişim/lisans yok | Şablon sayısı bizim sorumluluğumuzda |
+| 11 | «Paylaş» = cihazın Web Share menüsü (görsel + metin hazır); gerçek otomatik yayın sonraya | Meta/TikTok yayın API'leri uygulama incelemesi ve işletme hesabı ister; token saklama güvenlik tasarımı gerekir | Kullanıcı son dokunuşu yapar; hesap bağlama yol haritasında |
 | 10 | Telifli müzik gömülmez; öneri + kullanıcının kendi dosyası | Telif riski | Müzik platformda yayın anında eklenir |
 
 ## 3.4 Hata ve kota politikası

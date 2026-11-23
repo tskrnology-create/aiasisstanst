@@ -8,7 +8,6 @@ import { getSupabase } from "@/lib/supabase";
 import { loadDashboard, type DashboardData } from "@/lib/dashboard-data";
 import { weekStrip } from "@/lib/dashboard-utils";
 import { addDays, dayKey, normalizePostUrl, startOfDay } from "@/lib/calendar-utils";
-import { modeHref } from "@/lib/routes";
 import { postApi } from "@/lib/api-client";
 import { PLAN_SLOTS, type PlanItem } from "@/lib/plan-prompt";
 import { businessStore } from "@/lib/business-store";
@@ -256,7 +255,7 @@ export default function Week() {
                 <LinkButton
                   size="sm"
                   variant="primary"
-                  href={modeHref("metin", { prompt: item.prompt.slice(0, 500) }) + `&slot=${item.contentId}${item.platform ? `&platform=${item.platform}` : ""}`}
+                  href={`/olustur?prompt=${encodeURIComponent(item.prompt.slice(0, 500))}&slot=${item.contentId}${item.platform ? `&platform=${item.platform}` : ""}`}
                 >
                   <IconSparkles className="h-4 w-4" /> Hazırla
                 </LinkButton>
@@ -285,7 +284,7 @@ export default function Week() {
             <p className="text-sm font-semibold text-ink">Bu gün boş</p>
             <p className="mt-1 text-xs text-muted">Asistana söyle, içeriği hazırlayıp bu güne koyalım.</p>
             <Link
-              href={`/?gun=${dayKey(day)}`}
+              href="/olustur"
               className="mt-3 inline-flex h-10 items-center gap-2 rounded-full bg-brand px-4 text-sm font-semibold text-brand-ink"
             >
               <IconPlus className="h-4 w-4" /> Bu güne içerik ekle

@@ -252,7 +252,7 @@ export function PostPackageCard({
   );
 }
 
-function PackageEditor({ rowId, pkg, onCancel, onSaved }: { rowId: string; pkg: PostPackage; onCancel: () => void; onSaved: (next: PostPackage) => void }) {
+export function PackageEditor({ rowId, pkg, onCancel, onSaved }: { rowId: string; pkg: PostPackage; onCancel: () => void; onSaved: (next: PostPackage) => void }) {
   const [draft, setDraft] = useState<PostPackage>(pkg);
   const [tags, setTags] = useState(pkg.hashtags.join(" "));
   const [busy, setBusy] = useState(false);

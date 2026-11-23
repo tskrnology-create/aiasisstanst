@@ -7,7 +7,6 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { postApi } from "@/lib/api-client";
 import type { ContentIdea } from "@/lib/brand-prompt";
-import { modeHref } from "@/lib/routes";
 import { useBusinessContext } from "./BusinessContext";
 import { IconClose, IconSend, IconSparkles } from "./Icons";
 import { cx } from "./Ui";
@@ -116,13 +115,13 @@ export default function AssistantBubble({ signedIn }: { signedIn: boolean }) {
                   {m.ideas.map((idea) => (
                     <li key={idea.title + idea.prompt}>
                       <Link
-                        href={modeHref("metin", { prompt: idea.prompt.slice(0, 500) })}
+                        href={`/olustur?prompt=${encodeURIComponent(idea.prompt.slice(0, 500))}`}
                         onClick={() => setOpen(false)}
                         className="block rounded-2xl border border-line bg-surface-2/60 p-3 transition hover:border-brand"
                       >
                         <span className="block text-sm font-semibold text-ink">{idea.title}</span>
                         <span className="mt-0.5 block text-xs text-muted">{idea.prompt}</span>
-                        <span className="mt-1 block text-[11px] font-semibold text-brand">Stüdyo&apos;da yaz →</span>
+                        <span className="mt-1 block text-[11px] font-semibold text-brand">Oluştur →</span>
                       </Link>
                     </li>
                   ))}
@@ -135,7 +134,7 @@ export default function AssistantBubble({ signedIn }: { signedIn: boolean }) {
                   {m.suggestions && m.suggestions.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {m.suggestions.map((s) => (
-                        <Link key={s} href={modeHref("metin", { prompt: s })} onClick={() => setOpen(false)} className="rounded-full border border-brand/40 bg-brand-soft px-3 py-1 text-xs font-medium text-brand">
+                        <Link key={s} href={`/olustur?prompt=${encodeURIComponent(s)}`} onClick={() => setOpen(false)} className="rounded-full border border-brand/40 bg-brand-soft px-3 py-1 text-xs font-medium text-brand">
                           {s}
                         </Link>
                       ))}

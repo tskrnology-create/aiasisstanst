@@ -34,4 +34,4 @@ Sunucu günlüğü (Vercel), Supabase günlükleri; izlenecekler: üretim hata o
 1. **Şimdi:** plan, hazırla, düzenle, yanıtla, görsel/video/müzik yapıları.
 2. **Sonraki:** performans girişi (beğeni/erişim), en iyi saat önerisi, haftalık özet; yeni tablo + RLS gerekir.
 3. **Sonra:** AI video sağlayıcısı bağlama (kuyruk + iş durumu), toplu aylık plan, ekip/ajans rolleri ve onay akışı.
-4. **Uzun vadeli:** platform API'leriyle (kullanıcı onaylı) yayın zamanlama — platform politikası incelemesinden sonra.
+4. **Hesap bağlama ve otomatik yayın (ön koşullar):** Meta uygulaması + uygulama incelemesi (Instagram içerik yayını izni), Instagram işletme hesabı + Facebook sayfası, OAuth akışı, şifreli token saklama (sunucu tarafı, RLS dışı erişim yok), yenileme ve iptal akışı, TikTok için ayrı geliştirici onayı. Bunlar tamamlanmadan kod yazmak yerine «Paylaş» menüsü kullanılır.
