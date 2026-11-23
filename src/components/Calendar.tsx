@@ -534,6 +534,7 @@ export default function Calendar() {
         .from("contents")
         .select("id, prompt, tone, status")
         .eq("business_id", activeBusinessId)
+        .neq("status", "archived")
         .order("created_at", { ascending: false })
         .limit(100),
       supabase

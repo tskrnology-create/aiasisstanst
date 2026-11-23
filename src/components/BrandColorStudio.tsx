@@ -1,7 +1,6 @@
 "use client";
 
-// Marka renkleri: iki renk (ana %70 / yardımcı %30), hazır paletler, uyumlu öneriler,
-// logodan renk alma ve canlı gönderi önizlemesi.
+// Marka renkleri: iki renk, profil slider'ı, hazır paletler, öneriler ve canlı önizleme.
 
 import { useState } from "react";
 import {
@@ -10,8 +9,9 @@ import {
   isValidHex,
   normalizeHex,
   paletteAdvice,
-  percent,
   readPalette,
+  MIN_PRIMARY_SHARE,
+  MAX_PRIMARY_SHARE,
 } from "@/lib/brand-palette";
 import { PALETTE_PRESETS, extractPalette, harmonySecondaries } from "@/lib/palette-tools";
 import { Button, Callout, cx, hintClass, inputClass } from "./Ui";
@@ -34,7 +34,6 @@ async function colorsFromImage(dataUrl: string): Promise<{ primary: string; seco
 function Swatch({
   title,
   role,
-  share,
   value,
   fallback,
   onChange,
@@ -43,7 +42,6 @@ function Swatch({
 }: {
   title: string;
   role: string;
-  share: number;
   value: string;
   fallback: string;
   onChange: (hex: string) => void;
@@ -68,9 +66,7 @@ function Swatch({
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-semibold text-ink">{title}</span>
-          <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-medium text-muted">
-            {role} · {percent(share)}
-          </span>
+          <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-medium text-muted">{role}</span>
         </div>
         <input
           aria-label={`${title} kodu`}
@@ -90,6 +86,8 @@ function Swatch({
 
 export default function BrandColorStudio({
   colors,
+  primaryShare,
+  onPrimaryShareChange,
   onChange,
   brandName,
   logoDataUrl,
@@ -97,6 +95,8 @@ export default function BrandColorStudio({
   errorId,
 }: {
   colors: string[];
+  primaryShare: number;
+  onPrimaryShareChange: (share: number) => void;
   onChange: (next: string[]) => void;
   brandName: string;
   logoDataUrl: string | null;
@@ -105,7 +105,7 @@ export default function BrandColorStudio({
 }) {
   const [primaryText, secondaryText] = [colors[0] ?? "", colors[1] ?? ""];
   const bothValid = isValidHex(primaryText) && isValidHex(secondaryText);
-  const palette = readPalette(bothValid ? [primaryText, secondaryText] : []);
+  const palette = readPalette(bothValid ? [primaryText, secondaryText] : [], primaryShare);
   const advice = paletteAdvice(palette);
   const harmonies = isValidHex(primaryText) ? harmonySecondaries(primaryText) : [];
   const [logoMsg, setLogoMsg] = useState<string | null>(null);
@@ -133,7 +133,6 @@ export default function BrandColorStudio({
         <Swatch
           title="Ana renk"
           role="Baskın"
-          share={palette.share}
           value={primaryText}
           fallback={FALLBACK_PRIMARY}
           onChange={(v) => set(v, secondaryText)}
@@ -143,7 +142,6 @@ export default function BrandColorStudio({
         <Swatch
           title="Yardımcı renk"
           role="Vurgu"
-          share={palette.accent}
           value={secondaryText}
           fallback={FALLBACK_SECONDARY}
           onChange={(v) => set(primaryText, v)}
@@ -194,8 +192,8 @@ export default function BrandColorStudio({
                       )}
                     >
                       <span className="flex h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-line">
-                        <span className="w-[70%]" style={{ backgroundColor: p.primary }} />
-                        <span className="w-[30%]" style={{ backgroundColor: p.secondary }} />
+                        <span style={{ width: `${primaryShare}%`, backgroundColor: p.primary }} />
+                        <span className="flex-1" style={{ backgroundColor: p.secondary }} />
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-xs font-semibold text-ink">{p.name}</span>
@@ -219,14 +217,14 @@ export default function BrandColorStudio({
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">Önizleme (%70 / %30)</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">Önizleme</p>
           <div
             className="flex aspect-square w-full max-w-[260px] flex-col overflow-hidden rounded-2xl border border-line shadow-soft"
             aria-label="Marka renkleriyle örnek gönderi"
           >
             <div
-              className="flex flex-[7] flex-col justify-between p-4"
-              style={{ backgroundColor: palette.primary, color: palette.onPrimary }}
+              className="flex min-h-0 flex-col justify-between p-4"
+              style={{ flex: `0 0 ${primaryShare}%`, backgroundColor: palette.primary, color: palette.onPrimary }}
             >
               <span className="flex items-center gap-2">
                 {logoDataUrl && (
@@ -238,11 +236,29 @@ export default function BrandColorStudio({
               <span className="text-xl font-extrabold leading-tight">Kasım fırsatı başladı</span>
             </div>
             <div
-              className="flex flex-[3] items-center justify-between px-4 text-xs font-bold"
-              style={{ backgroundColor: palette.secondary, color: palette.onSecondary }}
+              className="flex items-center justify-between px-4 text-xs font-bold"
+              style={{ flex: `0 0 ${100 - primaryShare}%`, backgroundColor: palette.secondary, color: palette.onSecondary }}
             >
               <span>Hemen mesaj atın</span>
               <span aria-hidden="true">→</span>
+            </div>
+          </div>
+          <div className="space-y-1.5 rounded-xl border border-line bg-surface p-3">
+            <label htmlFor="brand-primary-share" className="sr-only">Ana ve yardımcı renk dengesi</label>
+            <input
+              id="brand-primary-share"
+              type="range"
+              min={MIN_PRIMARY_SHARE}
+              max={MAX_PRIMARY_SHARE}
+              step={1}
+              value={100 - primaryShare}
+              onChange={(event) => onPrimaryShareChange(100 - Number(event.target.value))}
+              aria-valuetext={`${primaryShare}% ana renk, ${100 - primaryShare}% yardımcı renk`}
+              className="brand-ratio-slider w-full"
+              style={{ background: `linear-gradient(to right, ${palette.primary} 0%, ${palette.secondary} 100%)` }}
+            />
+            <div className="flex justify-between text-[11px] font-medium text-muted">
+              <span>Ana renk</span><span>Yardımcı renk</span>
             </div>
           </div>
         </div>

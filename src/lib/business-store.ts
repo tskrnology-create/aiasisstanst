@@ -3,7 +3,7 @@
 
 import type { BusinessProfile } from "./brand-prompt";
 import { getSupabase } from "./supabase";
-import { isValidHex, normalizeHex, toStoredColors } from "./brand-palette";
+import { DEFAULT_RATIO, isValidHex, normalizeHex, normalizeShare, toStoredColors } from "./brand-palette";
 
 export type SocialPlatform =
   | "instagram"
@@ -22,6 +22,7 @@ export interface SocialAccount {
 
 export interface StoredBusiness extends BusinessProfile {
   id?: string;
+  primary_share: number;
   // v1'de logo küçük bir data URL olarak businesses.logo_url sütununda tutulur.
   logo_data_url: string | null;
   social_accounts: SocialAccount[];
@@ -60,6 +61,7 @@ export const businessStore: BusinessStore = {
       brand_voice: row.brand_voice ?? "",
       // [0] = ana renk, [1] = yardımcı renk. Eski kayıtlar readPalette içinde karşılanır.
       brand_colors: (row.brand_colors ?? []).slice(0, 2),
+      primary_share: normalizeShare(row.primary_share),
       content_language: row.content_language,
       logo_data_url: row.logo_url ?? null,
       social_accounts: (accounts ?? []) as SocialAccount[],
@@ -82,6 +84,7 @@ export const businessStore: BusinessStore = {
       target_audience: business.target_audience || null,
       brand_voice: business.brand_voice || null,
       brand_colors: storedColors,
+      primary_share: normalizeShare(business.primary_share),
       content_language: business.content_language,
       logo_url: business.logo_data_url,
     };
@@ -103,7 +106,7 @@ export const businessStore: BusinessStore = {
     });
     if (saveError || typeof businessId !== "string") {
       throw new Error(
-        `Marka profili ve sosyal hesaplar birlikte kaydedilemedi: ${saveError?.message ?? "RPC geçerli marka kimliği döndürmedi"}. schema_v6_atomic_profile_and_media_integrity.sql migration'ını uygulayın.`
+        `Marka profili ve sosyal hesaplar birlikte kaydedilemedi: ${saveError?.message ?? "RPC geçerli marka kimliği döndürmedi"}. Güncel migration'ları v9'a kadar sırasıyla uygulayın.`
       );
     }
 
@@ -118,6 +121,7 @@ export const EMPTY_BUSINESS: StoredBusiness = {
   target_audience: "",
   brand_voice: "",
   brand_colors: [],
+  primary_share: DEFAULT_RATIO,
   content_language: "tr",
   logo_data_url: null,
   social_accounts: [],

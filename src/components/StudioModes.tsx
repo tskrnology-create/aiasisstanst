@@ -5,13 +5,13 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { businessStore, type StoredBusiness } from "@/lib/business-store";
 import { suggestMusic } from "@/lib/music-suggestions";
 import { totalSeconds, type PostPackage } from "@/lib/post-formats";
 import { STUDIO_MODES, contentsHref, modeHref, type StudioMode } from "@/lib/routes";
-import { postApi, loadImage } from "@/lib/api-client";
+import { postApi } from "@/lib/api-client";
 import { useBusinessContext } from "./BusinessContext";
 import { REPLY_GOALS, REPLY_SOURCES, type ReplyGoal, type ReplyOption, type ReplySource } from "@/lib/reply-prompt";
 import Generator from "./Generator";
@@ -20,34 +20,35 @@ import MediaPicker from "./MediaPicker";
 import { CopyButton } from "./ShareControls";
 import { Button, Callout, Chip, SectionCard, Tag, cx, hintClass, inputClass } from "./Ui";
 import MusicPicker, { type MusicChoice } from "./MusicPicker";
-import { IconArrowLeft, IconImage, IconLibrary, IconVideo, IconClose } from "./Icons";
+import { IconArrowLeft, IconLibrary, IconVideo } from "./Icons";
 
 const MODE_ICON: Record<StudioMode, string> = { metin: "Aa", gorsel: "▣", birlikte: "Aa▣", video: "▶", yanit: "💬" };
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 
 export function StudioHub() {
   return (
     <div className="space-y-5">
-      <p className="text-sm text-muted">
-        Ne yapmak istediğinizi seçin. Her yapı tek başına çalışır; metin ve görseli birlikte istiyorsanız ortadaki yapıyı seçin.
-      </p>
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {STUDIO_MODES.map((m) => (
-          <li key={m.id}>
-            <Link
-              href={m.href}
-              className="flex h-full items-start gap-3.5 rounded-3xl border border-line bg-surface p-4 shadow-soft transition hover:-translate-y-0.5 hover:border-brand"
-            >
-              <span aria-hidden="true" className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-soft text-sm font-extrabold text-brand">
-                {MODE_ICON[m.id]}
-              </span>
-              <span className="min-w-0">
-                <span className="block text-base font-bold text-ink">{m.label}</span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-muted">{m.hint}</span>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <Link href="/studyo/birlikte" className="block rounded-3xl border border-brand/25 bg-brand-soft p-5 shadow-soft transition hover:border-brand">
+        <span className="text-xs font-bold uppercase tracking-wide text-brand">Önerilen akış</span>
+        <span className="mt-1 block text-xl font-extrabold text-ink">Bir paylaşım hazırla</span>
+        <span className="mt-1 block max-w-xl text-sm leading-relaxed text-muted">Önce mesajı netleştir, sonra gerekirse görselini ekle ve yayın zamanını seç. Paylaşım işlemi sende kalır.</span>
+        <span className="mt-4 inline-flex rounded-full bg-brand px-4 py-2 text-sm font-bold text-brand-ink">Yeni paylaşım başlat →</span>
+      </Link>
+      <details className="rounded-2xl border border-line bg-surface p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-ink">Sadece belirli bir içerik türü hazırlayacağım</summary>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+          {STUDIO_MODES.filter((m) => m.id !== "birlikte" && m.id !== "video").map((m) => (
+            <li key={m.id}>
+              <Link href={m.href} className="flex h-full items-start gap-3 rounded-2xl border border-line bg-surface-2/50 p-3 transition hover:border-brand">
+                <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-xs font-extrabold text-brand">{MODE_ICON[m.id]}</span>
+                <span><span className="block text-sm font-bold text-ink">{m.label}</span><span className="mt-0.5 block text-xs leading-relaxed text-muted">{m.hint}</span></span>
+              </Link>
+            </li>
+          ))}
+          <li><Link href={modeHref("video", { step: "kendi" })} className="flex h-full items-start gap-3 rounded-2xl border border-line bg-surface-2/50 p-3 transition hover:border-brand"><span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-xs font-extrabold text-brand">▶</span><span><span className="block text-sm font-bold text-ink">Hazır videom</span><span className="mt-0.5 block text-xs text-muted">Kendi MP4/WebM videonu yükle</span></span></Link></li>
+          <li><Link href={modeHref("video", { step: "senaryo" })} className="flex h-full items-start gap-3 rounded-2xl border border-line bg-surface-2/50 p-3 transition hover:border-brand"><span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-xs font-extrabold text-brand">▤</span><span><span className="block text-sm font-bold text-ink">Video senaryosu</span><span className="mt-0.5 block text-xs text-muted">Metin ve çekim planı oluştur</span></span></Link></li>
+        </ul>
+      </details>
     </div>
   );
 }
@@ -153,7 +154,7 @@ function OwnText() {
   );
 }
 
-/** Yalnız metin: şablon yok. Yapay zekâyla yaz ya da kendi metnini ekle; isteğe bağlı müzik notu. */
+/** Yalnız metin: şablon yok. Yapay zekâyla yaz ya da kendi metnini ekle. */
 export function TextStudio() {
   const params = useSearchParams();
   const own = params.get("adim") === "kendi";
@@ -167,7 +168,6 @@ export function TextStudio() {
         ]}
       />
       {own ? <OwnText /> : <Generator mode="metin" />}
-      <MusicPicker />
     </div>
   );
 }
@@ -273,157 +273,6 @@ function VideoClips({ contentId }: { contentId: string }) {
       <Callout tone="info">
         Video dosyası uygulama içinde kurgulanmaz: senaryoyu ve klipleri kullanarak telefonunuzdaki kurgu uygulamasında birleştirirsiniz.
       </Callout>
-    </div>
-  );
-}
-
-const MIN_IMAGES = 3;
-const MAX_IMAGES = 6;
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
-
-interface Pic {
-  id: number;
-  name: string;
-  url: string;
-}
-
-/** Yapay zekâ ile video: en az 3 görsel + metin. Servis henüz bağlı değil; arayüz ve istek hazır. */
-function VideoAi() {
-  const { activeBusinessId } = useBusinessContext();
-  const [pics, setPics] = useState<Pic[]>([]);
-  const [text, setText] = useState("");
-  const [ratio, setRatio] = useState<"9:16" | "16:9">("9:16");
-  const [music, setMusic] = useState<MusicChoice>({ mode: "none" });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const counter = useRef(0);
-
-  useEffect(() => {
-    return () => pics.forEach((p) => URL.revokeObjectURL(p.url));
-    // yalnızca ekrandan çıkarken kalan adresler serbest bırakılır
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function onFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    e.target.value = "";
-    setError(null);
-    const next: Pic[] = [];
-    for (const f of files) {
-      if (pics.length + next.length >= MAX_IMAGES) {
-        setError(`En fazla ${MAX_IMAGES} görsel ekleyebilirsiniz.`);
-        break;
-      }
-      if (!["image/png", "image/jpeg", "image/webp"].includes(f.type)) {
-        setError("Görseller PNG, JPG veya WebP olmalı.");
-        continue;
-      }
-      if (f.size > MAX_IMAGE_BYTES) {
-        setError("Her görsel 4 MB'den küçük olmalı.");
-        continue;
-      }
-      const url = URL.createObjectURL(f);
-      try {
-        await loadImage(url);
-        counter.current += 1;
-        next.push({ id: counter.current, name: f.name, url });
-      } catch {
-        URL.revokeObjectURL(url);
-        setError("Bir görsel okunamadı.");
-      }
-    }
-    if (next.length) setPics((cur) => [...cur, ...next]);
-  }
-
-  function remove(id: number) {
-    setPics((cur) => {
-      const hit = cur.find((p) => p.id === id);
-      if (hit) URL.revokeObjectURL(hit.url);
-      return cur.filter((p) => p.id !== id);
-    });
-  }
-
-  function move(id: number, dir: -1 | 1) {
-    setPics((cur) => {
-      const i = cur.findIndex((p) => p.id === id);
-      const j = i + dir;
-      if (i < 0 || j < 0 || j >= cur.length) return cur;
-      const copy = [...cur];
-      [copy[i], copy[j]] = [copy[j], copy[i]];
-      return copy;
-    });
-  }
-
-  const ready = pics.length >= MIN_IMAGES && text.trim().length >= 10;
-
-  async function submit() {
-    if (!ready || !activeBusinessId || busy) return;
-    setBusy(true);
-    setError(null);
-    setInfo(null);
-    try {
-      await postApi("/api/video/generate", { businessId: activeBusinessId, text: text.trim(), imageCount: pics.length, ratio, music: music.mode });
-      setInfo("Video hazırlanıyor.");
-    } catch (err) {
-      setInfo(err instanceof Error ? err.message : "Video servisi yanıt vermedi.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="space-y-5">
-      <SectionCard step="1" title="Görseller" description={`En az ${MIN_IMAGES}, en fazla ${MAX_IMAGES} görsel. Sıra videodaki sıradır.`}>
-        <ul className="grid grid-cols-3 gap-2" aria-label="Seçilen görseller">
-          {pics.map((p, i) => (
-            <li key={p.id} className="relative overflow-hidden rounded-2xl border border-line bg-surface-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.url} alt={`Görsel ${i + 1}: ${p.name}`} className="aspect-square w-full object-cover" />
-              <span className="absolute left-1.5 top-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white">{i + 1}</span>
-              <button type="button" onClick={() => remove(p.id)} aria-label={`Görsel ${i + 1} kaldır`} className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white">
-                <IconClose className="h-3 w-3" />
-              </button>
-              <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/60 to-transparent px-1.5 pb-1 pt-4 text-white">
-                <button type="button" onClick={() => move(p.id, -1)} disabled={i === 0} aria-label={`Görsel ${i + 1} öne al`} className="px-1 text-sm disabled:opacity-30">←</button>
-                <button type="button" onClick={() => move(p.id, 1)} disabled={i === pics.length - 1} aria-label={`Görsel ${i + 1} sona al`} className="px-1 text-sm disabled:opacity-30">→</button>
-              </div>
-            </li>
-          ))}
-          {pics.length < MAX_IMAGES && (
-            <li>
-              <label className="grid aspect-square cursor-pointer place-items-center rounded-2xl border border-dashed border-line-strong text-center text-xs font-semibold text-muted hover:border-brand hover:text-brand">
-                <span>
-                  <IconImage className="mx-auto mb-1 h-5 w-5" />
-                  Görsel ekle
-                </span>
-                <input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={onFiles} className="sr-only" aria-label="Görsel seç" />
-              </label>
-            </li>
-          )}
-        </ul>
-        <p className={cx(hintClass, "mt-2")}>{pics.length}/{MIN_IMAGES} zorunlu görsel{pics.length >= MIN_IMAGES ? " ✓" : ""} · PNG, JPG, WebP · 4 MB</p>
-      </SectionCard>
-
-      <SectionCard step="2" title="Metin" description="Videoda anlatılacak mesaj. Marka profilinizdeki bilgilerle birlikte kullanılır.">
-        <textarea className={cx(inputClass, "min-h-28 resize-y")} rows={4} maxLength={800} value={text} onChange={(e) => setText(e.target.value)} placeholder="Örn. Ekran değişimi 30 dakikada, 6 ay garantili. Hemen mesaj atın." aria-label="Video metni" />
-        <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Video oranı">
-          <span className="text-xs font-semibold text-muted">Oran</span>
-          <Chip active={ratio === "9:16"} onClick={() => setRatio("9:16")}>Reels / Hikâye 9:16</Chip>
-          <Chip active={ratio === "16:9"} onClick={() => setRatio("16:9")}>Yatay 16:9</Chip>
-        </div>
-      </SectionCard>
-
-      <MusicPicker onChange={setMusic} />
-
-      {error && <Callout tone="error">{error}</Callout>}
-      {info && <Callout tone="info">{info}</Callout>}
-      <Callout tone="warning">Yapay zekâ video servisi henüz bağlı değil; düğme şimdilik yalnızca isteğinizi doğrular.</Callout>
-      <Button type="button" onClick={submit} disabled={!ready || busy || !activeBusinessId} className="w-full sm:w-auto">
-        <IconVideo />
-        {busy ? "Gönderiliyor…" : "Video üret"}
-      </Button>
     </div>
   );
 }
@@ -543,18 +392,16 @@ export function VideoStudio() {
   const params = useSearchParams();
   const contentId = params.get("content") ?? "";
   const step = params.get("adim");
-  const view = step === "kendi" ? "kendi" : step === "senaryo" || step === "klip" ? "senaryo" : "ai";
+  const view = step === "kendi" ? "kendi" : "senaryo";
   return (
     <div className="space-y-5">
       <BackToHub label="Video" />
       <Pills
         items={[
-          { href: modeHref("video"), label: "Yapay zekâ ile", active: view === "ai" },
           { href: modeHref("video", { step: "kendi" }), label: "Kendi videom", active: view === "kendi" },
           { href: modeHref("video", { step: "senaryo" }), label: "Senaryo", active: view === "senaryo" },
         ]}
       />
-      {view === "ai" && <VideoAi />}
       {view === "kendi" && <VideoOwn />}
       {view === "senaryo" && (step === "klip" && contentId ? <VideoClips contentId={contentId} /> : <Generator mode="video" />)}
     </div>

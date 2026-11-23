@@ -59,6 +59,7 @@ export async function POST(request: Request) {
       target_audience: business.target_audience,
       brand_voice: business.brand_voice,
       brand_colors: business.brand_colors ?? [],
+      primary_share: business.primary_share,
       content_language: business.content_language,
     };
     const result = await generateJson(

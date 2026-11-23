@@ -20,12 +20,13 @@ describe("brand-palette", () => {
   });
 
   it("pay oranını güvenli sınırlar içinde tam sayıya yuvarlar", () => {
-    expect(normalizeShare(91)).toBe(90);
-    expect(normalizeShare(48.6)).toBe(50);
+    expect(normalizeShare(101)).toBe(100);
+    expect(normalizeShare(-1)).toBe(0);
     expect(normalizeShare("72.4")).toBe(72);
     expect(normalizeShare(Number.NaN)).toBe(DEFAULT_RATIO);
-    expect(isRatioId(90)).toBe(true);
-    expect(isRatioId(91)).toBe(false);
+    expect(isRatioId(0)).toBe(true);
+    expect(isRatioId(100)).toBe(true);
+    expect(isRatioId(101)).toBe(false);
   });
 
   it("ana/yardımcı renk oranını birlikte ve tutarlı döndürür", () => {

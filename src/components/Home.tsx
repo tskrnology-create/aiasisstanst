@@ -7,37 +7,46 @@ import { useEffect, useMemo, useState } from "react";
 import { loadDashboard, type DashboardData } from "@/lib/dashboard-data";
 import { greeting, nextAction, weekStrip } from "@/lib/dashboard-utils";
 import { upcomingSpecialDays } from "@/lib/special-days";
-import { STUDIO_MODES, modeHref } from "@/lib/routes";
+import { modeHref } from "@/lib/routes";
 import { useBusinessContext } from "./BusinessContext";
 import { IconArrowRight } from "./Icons";
 import { cx } from "./Ui";
 
 export default function Home() {
   const { activeBusinessId: businessId, isBusinessLoading } = useBusinessContext();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [snapshot, setSnapshot] = useState<{ businessId: string; data: DashboardData } | null>(null);
+  const [failedBusinessId, setFailedBusinessId] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
   const [now] = useState(() => new Date());
 
   useEffect(() => {
     let cancelled = false;
-    if (!businessId) return;
+    if (!businessId || isBusinessLoading) return;
     loadDashboard(businessId)
-      .then((d) => !cancelled && (setData(d), setFailed(false)))
-      .catch(() => !cancelled && setFailed(true));
+      .then((data) => {
+        if (!cancelled) {
+          setSnapshot({ businessId, data });
+          setFailedBusinessId(null);
+        }
+      })
+      .catch(() => { if (!cancelled) setFailedBusinessId(businessId); });
     return () => {
       cancelled = true;
     };
-  }, [businessId]);
+  }, [businessId, isBusinessLoading, version]);
 
-  const strip = useMemo(() => weekStrip(data?.weekIsos ?? [], now), [data, now]);
+  const currentData = snapshot?.businessId === businessId ? snapshot.data : null;
+  const loading = Boolean(businessId && !isBusinessLoading && !currentData && failedBusinessId !== businessId);
+  const failed = Boolean(businessId && failedBusinessId === businessId);
+  const strip = useMemo(() => weekStrip(currentData?.weekIsos ?? [], now), [currentData, now]);
   const specialDays = useMemo(() => upcomingSpecialDays(now, 30, 3), [now]);
-  const next = data
+  const next = currentData
     ? nextAction({
-        overdue: data.overdue,
-        total: data.total,
-        drafts: data.drafts,
-        approved: data.approved,
-        upcoming7: data.upcoming.filter((i) => new Date(i.scheduled_at).getTime() >= now.getTime()).length,
+        overdue: currentData.overdue,
+        total: currentData.total,
+        drafts: currentData.drafts,
+        approved: currentData.approved,
+        upcoming7: currentData.upcoming.filter((i) => new Date(i.scheduled_at).getTime() >= now.getTime()).length,
       })
     : null;
 
@@ -46,7 +55,7 @@ export default function Home() {
       <header className="space-y-1 pt-1">
         <p className="text-sm text-muted">
           {greeting(now)}
-          {data ? `, ${data.business.name}` : ""}
+          {currentData ? `, ${currentData.business.name}` : ""}
         </p>
         <h1 className="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">Bugün ne paylaşalım?</h1>
       </header>
@@ -56,7 +65,13 @@ export default function Home() {
           Başlamak için önce markanı oluştur →
         </Link>
       )}
-      {failed && <p role="alert" className="text-sm text-danger">Özet yüklenemedi.</p>}
+      {loading && <p role="status" className="rounded-2xl border border-line bg-surface p-4 text-sm text-muted">İş özetin yükleniyor…</p>}
+      {failed && (
+        <div role="alert" className="rounded-2xl border border-danger/25 bg-danger-soft p-4 text-sm text-danger">
+          <p>İş özeti yüklenemedi. İçeriklerin silinmedi; bağlantıyı kontrol edip yeniden deneyebilirsin.</p>
+          <button type="button" onClick={() => setVersion((v) => v + 1)} className="mt-2 font-semibold underline underline-offset-2">Yeniden dene</button>
+        </div>
+      )}
 
       <Link href="/hafta" className="flex items-center justify-between rounded-2xl bg-brand p-4 text-brand-ink shadow-pop transition hover:-translate-y-0.5">
         <span>
@@ -82,19 +97,22 @@ export default function Home() {
 
       <section aria-label="Stüdyo" className="space-y-2.5">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-ink">Ne hazırlayacaksın?</h2>
+          <h2 className="text-sm font-bold text-ink">Bir sonraki paylaşım</h2>
           <Link href="/studyo" className="text-xs font-semibold text-brand">Stüdyo →</Link>
         </div>
-        <ul className="grid grid-cols-2 gap-2.5">
-          {STUDIO_MODES.map((m) => (
-            <li key={m.id}>
-              <Link href={m.href} className="flex h-full flex-col rounded-2xl border border-line bg-surface p-3.5 shadow-soft transition hover:border-brand">
-                <span className="text-sm font-bold text-ink">{m.label}</span>
-                <span className="mt-0.5 text-[11px] leading-snug text-muted">{m.hint}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <Link href="/studyo/birlikte" className="block rounded-3xl border border-brand/25 bg-brand-soft p-5 transition hover:border-brand">
+          <span className="text-base font-bold text-ink">Fikirden paylaşım planına ilerle</span>
+          <span className="mt-1 block text-sm leading-relaxed text-muted">Metni hazırla, gerekirse görsel ekle, hesabı ve tarihi seç. Son paylaşımı sosyal platformda sen yaparsın.</span>
+          <span className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-brand">Paylaşım hazırla <IconArrowRight className="h-4 w-4" /></span>
+        </Link>
+        <details className="rounded-2xl border border-line bg-surface px-4 py-3">
+          <summary className="cursor-pointer text-sm font-semibold text-ink">Sadece tek bir iş yap</summary>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href={modeHref("metin")} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink">Yalnız metin</Link>
+            <Link href={modeHref("gorsel")} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink">Yalnız görsel</Link>
+            <Link href={modeHref("video", { step: "kendi" })} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink">Hazır videomu ekle</Link>
+          </div>
+        </details>
       </section>
 
       <section aria-label="Bu hafta" className="space-y-2.5">

@@ -49,7 +49,7 @@ export async function getBusinessById(supabase: SupabaseClient, businessId: unkn
   if (!isUuid(businessId)) return { business: null, error: null };
   const { data, error } = await supabase
     .from("businesses")
-    .select("id, name, industry, products, target_audience, brand_voice, brand_colors, content_language")
+    .select("id, name, industry, products, target_audience, brand_voice, brand_colors, primary_share, content_language")
     .eq("id", businessId)
     .maybeSingle();
   return { business: data, error };

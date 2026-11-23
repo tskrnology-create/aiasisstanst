@@ -1,12 +1,9 @@
 // Marka paleti katmanı — ürünün renk çekirdeği.
-// Kural: markada TEK bir ana renk ve TEK bir yardımcı renk vardır; iki renk
-// rastgele kullanılmaz, orantılı paylaşılır. Oran varsayılanı %70 ana / %30
-// yardımcıdır ve görsel stüdyosunda tek görsel için değiştirilebilir.
+// Kural: markada TEK bir ana renk ve TEK bir yardımcı renk vardır; oran profil
+// slider'ında 0–100 arasında seçilir. Varsayılan %70 ana renktir.
 //
 // Veritabanı (businesses.brand_colors text[]) yalnızca iki hex kodu tutar:
-// [0] = ana renk, [1] = yardımcı renk. Oran, tasarım kuralı olarak kodda
-// yaşar; böylece eski kayıtlar (0, 1 veya 3+ renk) migrasyon gerektirmeden
-// okunur. Saf fonksiyonlardır; Node tarafında test edilebilir.
+// [0] = ana renk, [1] = yardımcı renk. Saf fonksiyonlar Node tarafında test edilir.
 
 export const MAX_BRAND_COLORS = 2;
 export const FALLBACK_PRIMARY = "#1f2937";
@@ -16,8 +13,8 @@ export const FALLBACK_SECONDARY = "#f59e0b";
 export type RatioId = number;
 
 export const DEFAULT_RATIO = 70;
-export const MIN_PRIMARY_SHARE = 50;
-export const MAX_PRIMARY_SHARE = 90;
+export const MIN_PRIMARY_SHARE = 0;
+export const MAX_PRIMARY_SHARE = 100;
 
 /** Slider/API için tam sayı yüzdeyi güvenli aralığa alır. */
 export function normalizeShare(value: unknown, fallback = DEFAULT_RATIO): number {

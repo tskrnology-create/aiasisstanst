@@ -2,12 +2,12 @@
 
 // Hafta: 7 günlük plan şeridi. Güne dokun, o günün paylaşımlarını gör; boş günde asistanı aç.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
 import { loadDashboard, type DashboardData } from "@/lib/dashboard-data";
 import { weekStrip } from "@/lib/dashboard-utils";
-import { addDays, dayKey, startOfDay } from "@/lib/calendar-utils";
+import { addDays, dayKey, normalizePostUrl, startOfDay } from "@/lib/calendar-utils";
 import { modeHref } from "@/lib/routes";
 import { postApi } from "@/lib/api-client";
 import { PLAN_SLOTS, type PlanItem } from "@/lib/plan-prompt";
@@ -19,35 +19,50 @@ import { IconCheck, IconPlus, IconSparkles } from "./Icons";
 export default function Week() {
   const { activeBusinessId: businessId } = useBusinessContext();
   const [data, setData] = useState<DashboardData | null>(null);
+  const [loadedBusinessId, setLoadedBusinessId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorBusinessId, setErrorBusinessId] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [postUrl, setPostUrl] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
   const [now] = useState(() => new Date());
+  const requestSequence = useRef(0);
 
-  const load = useCallback(async () => {
-    if (!businessId) return;
-    try {
-      setData(await loadDashboard(businessId));
-      setError(null);
-    } catch {
-      setError("Hafta yüklenemedi.");
-    }
+  const load = useCallback(() => {
+    if (!businessId) return Promise.resolve();
+    const requestId = ++requestSequence.current;
+    return loadDashboard(businessId)
+      .then((result) => {
+        if (requestSequence.current !== requestId) return;
+        setData(result);
+        setLoadedBusinessId(businessId);
+        setError(null);
+        setErrorBusinessId(null);
+      })
+      .catch(() => {
+        if (requestSequence.current !== requestId) return;
+        setError("Hafta yüklenemedi.");
+        setErrorBusinessId(businessId);
+        setLoadedBusinessId(businessId);
+      });
   }, [businessId]);
 
   useEffect(() => {
-    let cancelled = false;
     if (!businessId) return;
-    loadDashboard(businessId)
-      .then((d) => !cancelled && setData(d))
-      .catch(() => !cancelled && setError("Hafta yüklenemedi."));
+    void load();
     return () => {
-      cancelled = true;
+      requestSequence.current += 1;
     };
-  }, [businessId]);
+  }, [businessId, load]);
 
-  const strip = useMemo(() => weekStrip(data?.weekIsos ?? [], now), [data, now]);
+  const currentData = loadedBusinessId === businessId ? data : null;
+  const currentError = errorBusinessId === businessId ? error : null;
+  const loading = Boolean(businessId && !currentData && !currentError);
+  const strip = useMemo(() => weekStrip(currentData?.weekIsos ?? [], now), [currentData, now]);
   const day = startOfDay(addDays(now, selected));
-  const items = (data?.upcoming ?? []).filter((i) => dayKey(new Date(i.scheduled_at)) === dayKey(day));
-  const overdue = (data?.upcoming ?? []).filter((i) => new Date(i.scheduled_at) < startOfDay(now));
+  const items = (currentData?.upcoming ?? []).filter((i) => dayKey(new Date(i.scheduled_at)) === dayKey(day));
+  const overdue = (currentData?.upcoming ?? []).filter((i) => new Date(i.scheduled_at) < startOfDay(now));
 
   const [proposal, setProposal] = useState<PlanItem[] | null>(null);
   const [picked, setPicked] = useState<Set<number>>(new Set());
@@ -110,15 +125,33 @@ export default function Week() {
     }
   }
 
-  async function markDone(id: string) {
-    const { error: err } = await getSupabase().from("calendar_items").update({ done: true }).eq("id", id);
-    if (err) setError("İşaretlenemedi.");
-    else void load();
+  async function markDone(event: React.FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault();
+    const normalizedUrl = normalizePostUrl(postUrl);
+    if (normalizedUrl === undefined) {
+      setError("Gönderi bağlantısı http:// veya https:// ile başlamalıdır.");
+      return;
+    }
+    if (!businessId) return;
+    setSavingId(id);
+    const { error: err } = await getSupabase().from("calendar_items")
+      .update({ done: true, posted_at: new Date().toISOString(), post_url: normalizedUrl })
+      .eq("id", id)
+      .eq("business_id", businessId);
+    setSavingId(null);
+    if (err) setError("Paylaşım kaydedilemedi. Tekrar deneyin.");
+    else {
+      setConfirmingId(null);
+      setPostUrl("");
+      void load();
+    }
   }
 
   const time = (iso: string) => new Date(iso).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 
   if (!businessId) return <EmptyState title="Önce bir marka seçin" description="Hafta planı seçili markaya göre gösterilir." />;
+  if (loading || (!currentData && !error)) return <Callout tone="info">Hafta planı yükleniyor…</Callout>;
+  if (currentError) return <Callout tone="error">{currentError} <button type="button" onClick={() => void load()} className="ml-2 font-semibold underline">Yeniden dene</button></Callout>;
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
@@ -127,7 +160,7 @@ export default function Week() {
         <h1 className="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">Haftam</h1>
       </header>
 
-      {error && <Callout tone="error">{error}</Callout>}
+      {error && errorBusinessId !== businessId && <Callout tone="error">{error}</Callout>}
 
       {!proposal ? (
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-brand/25 bg-brand-soft p-3.5">
@@ -228,10 +261,23 @@ export default function Week() {
                   <IconSparkles className="h-4 w-4" /> Hazırla
                 </LinkButton>
               )}
-              <Button size="sm" variant="secondary" onClick={() => markDone(item.id)} disabled={!item.ready}>
+              <Button size="sm" variant="secondary" onClick={() => { setConfirmingId(item.id); setPostUrl(""); }} disabled={!item.ready}>
                 <IconCheck className="h-4 w-4" /> Paylaşıldı
               </Button>
             </div>
+            {confirmingId === item.id && (
+              <form onSubmit={(event) => markDone(event, item.id)} className="mt-3 space-y-2 rounded-xl border border-ok/25 bg-ok-soft/30 p-3">
+                <p className="text-xs font-semibold text-ink">Yayını gerçekten sosyal platformda yaptıysan kaydet.</p>
+                <label className="block space-y-1 text-xs text-muted">
+                  <span>Gönderi bağlantısı (isteğe bağlı)</span>
+                  <input type="url" value={postUrl} onChange={(event) => setPostUrl(event.target.value)} placeholder="https://…" className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink" />
+                </label>
+                <div className="flex gap-2">
+                  <Button type="submit" size="sm" disabled={savingId === item.id}>{savingId === item.id ? "Kaydediliyor…" : "Manuel paylaşımı kaydet"}</Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmingId(null)}>Vazgeç</Button>
+                </div>
+              </form>
+            )}
           </article>
         ))}
         {items.length === 0 && !(selected === 0 && overdue.length) && (

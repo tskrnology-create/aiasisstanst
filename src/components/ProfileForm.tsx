@@ -241,6 +241,8 @@ function ProfileFormWorkspace({
           <Field label="Marka renkleri" error={undefined}>
             <BrandColorStudio
               colors={colors.length ? colors : ["", ""]}
+              primaryShare={form.primary_share}
+              onPrimaryShareChange={(next) => update("primary_share", next)}
               onChange={(next) => update("brand_colors", next)}
               brandName={form.name}
               logoDataUrl={form.logo_data_url ?? null}

@@ -15,7 +15,9 @@ const VIEWS: ReadonlyArray<{ id: ContentsView; label: string }> = [
 ];
 
 export default function ContentsHub() {
-  const view: ContentsView = useSearchParams().get("gorunum") === "takvim" ? "takvim" : "liste";
+  const params = useSearchParams();
+  const view: ContentsView = params.get("gorunum") === "takvim" ? "takvim" : "liste";
+  const contentId = params.get("content") ?? undefined;
   return (
     <div className="space-y-5">
       <div role="tablist" aria-label="Görünüm" className="inline-flex rounded-xl border border-line bg-surface-2/80 p-1">
@@ -24,7 +26,7 @@ export default function ContentsHub() {
             key={v.id}
             role="tab"
             aria-selected={view === v.id}
-            href={contentsHref({ view: v.id })}
+            href={contentsHref({ view: v.id, contentId })}
             replace
             className={cx(
               "rounded-lg px-4 py-1.5 text-sm font-medium transition",

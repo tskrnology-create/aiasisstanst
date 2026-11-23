@@ -18,6 +18,8 @@ export interface BusinessProfile {
   brand_voice?: string | null;
   /** [ana renk, yardımcı renk] — sıralama önemlidir. */
   brand_colors?: string[];
+  /** Marka varsayılanında ana rengin payı; tekil görselde geçersiz kılınabilir. */
+  primary_share?: number;
   content_language: ContentLanguage;
 }
 
@@ -48,7 +50,7 @@ const LANGUAGE_NAME: Record<ContentLanguage, string> = {
 
 export function buildBrandSystemPrompt(profile: BusinessProfile): string {
   const lang = LANGUAGE_NAME[profile.content_language];
-  const palette = readPalette(profile.brand_colors);
+  const palette = readPalette(profile.brand_colors, profile.primary_share);
   return [
     `Sen "${clean(profile.name)}" işletmesi için çalışan bir sosyal medya içerik uzmanısın.`,
     ``,

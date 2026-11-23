@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import type { ReactNode } from "react";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import AppShell from "@/components/AppShell";
 import "./globals.css";
@@ -28,7 +29,7 @@ export const viewport: Viewport = {
 // Sayfa boyamasından önce tema uygulanır; böylece açılışta beyaz/koyu yanıp sönmesi olmaz.
 const themeInit = `(function(){try{var k='ai-asisst-theme';var s=localStorage.getItem(k);var d=s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="tr" className={`${jakarta.variable} h-full antialiased`} suppressHydrationWarning>
       <head>

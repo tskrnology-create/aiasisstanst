@@ -119,7 +119,7 @@ function VisualCreatorWorkspace({
   const [music, setMusic] = useState<MusicChoice>({ mode: "none" });
   const [format, setFormat] = useState<FormatId>("post");
   const [template, setTemplate] = useState<TemplateId>(mode === "gorsel" ? DEFAULT_PHOTO_TEMPLATE : DEFAULT_TEMPLATE);
-  // Ana rengin yüzdesi 50–90 arasında tek tek ayarlanır; yardımcı renk kalandır.
+  // Profil dengesinden başlar; tekil görsel için ana renk payı 0–100 arasında seçilebilir.
   const [ratioId, setRatioId] = useState<RatioId>(DEFAULT_RATIO);
   const [showStorySafeArea, setShowStorySafeArea] = useState(true);
   const [style, setStyle] = useState<Style>("photo");
@@ -151,6 +151,7 @@ function VisualCreatorWorkspace({
       .then(([b, c]) => {
         if (!active) return;
         setBiz(b);
+        if (b?.primary_share != null) setRatioId(b.primary_share);
         if (c.error) setLoadError("İçerikler yüklenemedi: " + c.error.message);
         else {
           const rows = (c.data ?? []) as ContentRow[];
@@ -330,9 +331,7 @@ function VisualCreatorWorkspace({
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((result) => result ? resolve(result) : reject(new Error("PNG hazırlanamadı.")), "image/png");
       });
-      const visualPrompt = selected
-        ? `Görsel tasarımı · ${selected.prompt}`
-        : `Görsel tasarımı · ${headline.trim() || "Marka içeriği"}`;
+      const visualPrompt = selected?.prompt || `Görsel tasarımı · ${headline.trim() || "Marka içeriği"}`;
       const { data: sessionData, error: sessionError } = await getSupabase().auth.getSession();
       const accessToken = sessionData.session?.access_token;
       if (sessionError || !accessToken) throw new Error("Oturum doğrulanamadı. Yeniden giriş yapıp tekrar deneyin.");
@@ -340,6 +339,7 @@ function VisualCreatorWorkspace({
       const form = new FormData();
       form.append("image", blob, "visual.png");
       form.append("businessId", biz.id);
+      if (contentId) form.append("contentId", contentId);
       form.append("prompt", visualPrompt.slice(0, 500));
       form.append("tone", selected?.tone ?? "");
       form.append("postText", selected?.post_text || headline.trim() || "");
@@ -353,14 +353,19 @@ function VisualCreatorWorkspace({
         headers: { Authorization: `Bearer ${accessToken}` },
         body: form,
       });
-      const payload = await response.json().catch(() => ({})) as { error?: unknown; content?: ContentRow };
+      const payload = await response.json().catch(() => ({})) as { error?: unknown; content?: ContentRow; cleanupWarning?: unknown };
       if (!response.ok) {
         throw new Error(typeof payload.error === "string" ? payload.error : "Görsel kütüphaneye kaydedilemedi.");
       }
       const savedContent = payload.content;
       if (!savedContent) throw new Error("Görsel kaydedildi ancak kütüphane yanıtı alınamadı.");
       setContents((current) => [savedContent, ...current.filter((item) => item.id !== savedContent.id)]);
-      setNotice("Görsel taslağı kütüphaneye kaydedildi.");
+      setContentId(savedContent.id);
+      setNotice(typeof payload.cleanupWarning === "string"
+        ? payload.cleanupWarning
+        : contentId
+          ? "Görsel mevcut içeriğe kaydedildi; içerik kimliği korundu."
+          : "Görsel taslağı kütüphaneye kaydedildi.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Görsel kaydedilemedi.");
     } finally {
@@ -609,7 +614,7 @@ function VisualCreatorWorkspace({
                   background: `linear-gradient(to right, ${palette.primary} 0%, ${palette.primary} ${ratioId}%, ${palette.secondary} ${ratioId}%, ${palette.secondary} 100%)`,
                 }}
               />
-              <p className={hintClass}>Renkleri profil sayfasından değiştirebilirsiniz.</p>
+              <p className={hintClass}>Bu görsel için geçerlidir; başlangıç dengesi marka profilinizden gelir.</p>
             </div>
             <div className="flex justify-end">
               {mode === "birlikte" && <Button type="button" variant="soft" onClick={() => setTab("background")}>Arka plana geç →</Button>}

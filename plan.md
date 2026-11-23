@@ -15,19 +15,21 @@ Hedef kullanıcı ve temel iş: (1) ilk kez gelen küçük işletme sahibi marka
 - **Ölçekleme ve güvenilirlik:** kütüphanenin 200 kayıt ve plan seçicilerinin 100 kayıt sınırını aşan arama/sayfalama; Supabase şema sürüm sağlık kontrolü; medya aramasına ve upload'a maliyet kontrollü rate limit; görsel fetch yönlendirmelerini ve ebeveyn döngüsü riskini giderme; schema sürüm sırası ve RLS/API testlerini güçlendirme. Canlı Supabase durumuna ilişkin iddia, yalnız ayrı doğrulanmış gözleme dayanır.
 - **Daha sonra, ürün sınırını koruyarak:** kullanıcı talebiyle ancak iş değeri gösterilirse e-posta/push bildirimleri, ekip rolleri, geniş analitik, platform OAuth'u veya otomatik yayın değerlendirilir. Bunlar mevcut aşamada taahhüt değildir ve bu görevde uygulanmaz.
 
-## Pazar araştırması
+## Araştırmaya dayalı ürün kararları
 
-Benzer ürünler hakkında yedi hizmet için (Buffer, Hootsuite, Later, Metricool, Sprout Social, Canva Content Planner ve Planable) resmi kaynaklı karşılaştırma yürütülüyor. Nihai araştırma raporu, rakip özelliklerini kopyalama listesi değil, kullanıcının iş akışındaki ihtiyaca göre ürün kararlarını gerekçelendirecek. Kaynak bağlantıları raporda korunmalı; doğrulanmamış fiyat, pazar payı veya pazar büyüklüğü iddiası kullanılmamalı.
+Buffer, Hootsuite, Later, Metricool ve Sprout Social'ın resmî belgeleri; otomatik yayınlama ile bildirimle/elle tamamlanan yayın arasındaki ayrımı, taslak ile tarih atanmış gönderi arasındaki farkı ve platform/format kabiliyetlerinin eşit olmadığını doğruluyor. Bu, kullanıcıların en çok zorlandığı konuların ölçülmüş sıklığı olarak sunulmuyor; belgelenmiş ürün davranışlarından çıkan tasarım gerekçesidir. Kaynaklar ve çıkarımlar [`docs/social-workflow-research.md`](docs/social-workflow-research.md) içinde.
+
+Ürün, planlama kaydını yayın kanıtı saymaz. `Taslak`, `planlandı`, `manuel eylem bekliyor` ve `kullanıcı tarafından paylaşıldı olarak kaydedildi` ayrı durum anlamları taşır; paylaşım linki isteğe bağlıdır, kullanıcı bildirimi olarak kaydedilir ve platformdan doğrulanmış sayılmaz. Platform desteği ve biçim farklılıkları içerik üretiminde dikkate alınır; otomatik yayınlama bu MVP kapsamına alınmaz.
 
 ## Denetimde görülen başlıca boşluklar
 
 1. `/` işletme paneli yerine marka profil formu olarak açılıyor; kullanıcıya sıradaki iş, planlar, gecikmeler ve durum özeti sunulmuyor.
 2. Profil yükleme hatasında boş form açılıp kaydetmeye izin verilebiliyor; takvimde sorgu hatası varken boş veriyle form kullanılabiliyor.
 3. Kütüphane son 200, takvim ve medya seçicileri son 100 içerikle sınırlı; eski içerikler aranıp seçilemiyor.
-4. Üretim/görsel/takvim geçişi içeriğin kimliğini/bağlamını taşımıyor ve üretilen metni doğrudan düzenlemek için kütüphaneye dönmek gerekiyor.
+4. Üretim/görsel/takvim geçişi içeriğin kimliğini/bağlamını kaybetmemeli; özellikle seçilmiş içerik için görsel kaydı yeni ve ilişkisiz içerik oluşturmamalı.
 5. Takvim hesap seçimi boşaltılırken eski platform kalabiliyor; uzun bekleme sonrası planlanan metnin hangi sürümü olduğu açık değil.
 6. Medya API'lerinde dağıtık kullanıcı kotası görünmüyor; Pixabay görsel indirme yönlendirmesinde SSRF savunması güçlendirilmeli; v1 SQL başlangıç migration'ı tekrar uygulanmaya uygun değil.
-7. Profildeki değişiklikler marka değiştirirken sessizce kaybolabilir; upload→DB iki adımlı başarısızlık yetim dosya bırakabilir. Bu iki veri-tutarlılığı sorunu ürün yol haritasında ayrıca izlenecek.
+7. Profildeki değişiklikler marka değiştirirken sessizce kaybolabilir; upload→DB iki adımlı başarısızlık yetim dosya bırakabilir. Bu veri-tutarlılığı sorunları açık kalan işler olarak takip edilir.
 
 ## Uygulama ve tasarım yaklaşımı
 
@@ -42,7 +44,7 @@ Benzer ürünler hakkında yedi hizmet için (Buffer, Hootsuite, Later, Metricoo
 - `src/app`: sayfa rotaları ve API uçları. `/` dashboard ve `/marka` profil sayfası birbirinden ayrılır.
 - `src/components`: AppShell/BusinessContext, dashboard, profil, metin üretici, görsel stüdyosu, takvim, medya seçici, kütüphane ve ortak UI.
 - `src/lib`: Supabase erişimi, marka deposu, takvim ve kütüphane dönüşümleri, medya/doğrulama ve saf domain kuralları.
-- `schema.sql`, `schema_v2_*` … `schema_v6_*`: kullanıcı Supabase ortamına sıralı uygulanan tablolar, RLS, fonksiyonlar ve storage politikaları.
+- `schema.sql`, `schema_v2_*` … `schema_v9_*`: kullanıcı Supabase ortamına sıralı uygulanan tablolar, RLS, fonksiyonlar ve storage politikaları. v9 bu görevde hazırlanmış, canlıya uygulanmamıştır.
 - `docs`: kaynaklı rakip araştırması ve karar gerekçeleri.
 
 ## Kalite ve teslimat
