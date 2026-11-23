@@ -77,34 +77,46 @@ function PromptIdeas({ onPick }: { onPick: (text: string) => void }) {
 }
 
 function ResultCard({ row, headline, mode }: { row: GeneratedRow; headline?: string; mode: StudioMode }) {
+  const textEditHref = modeHref("metin", { step: "kendi", contentId: row.id });
   if (row.package) {
     if (mode === "metin") {
       return (
-        <PostPackageCard
-          row={row}
-          pkg={row.package}
-          headline={headline}
-          nextStep={null}
-        />
+        <div className="space-y-3">
+          <PostPackageCard
+            row={row}
+            pkg={row.package}
+            headline={headline}
+            nextStep={null}
+          />
+          <LinkButton href={textEditHref} variant="secondary" size="sm">Metni stüdyoda düzenle</LinkButton>
+        </div>
       );
     }
     if (mode === "video") {
       return (
-        <PostPackageCard
-          row={row}
-          pkg={row.package}
-          headline={headline}
-          nextStep={{ href: modeHref("video", { step: "klip", contentId: row.id }), label: "Sonraki adım: Klipler" }}
-          planHref={null}
-        />
+        <div className="space-y-3">
+          <PostPackageCard
+            row={row}
+            pkg={row.package}
+            headline={headline}
+            nextStep={{ href: modeHref("video", { step: "klip", contentId: row.id }), label: "Sonraki adım: Klipler" }}
+            planHref={null}
+          />
+          <LinkButton href={textEditHref} variant="secondary" size="sm">Metni stüdyoda düzenle</LinkButton>
+        </div>
       );
     }
-    return <PostPackageCard row={row} pkg={row.package} headline={headline} />;
+    return (
+      <div className="space-y-3">
+        <PostPackageCard row={row} pkg={row.package} headline={headline} />
+        <LinkButton href={textEditHref} variant="secondary" size="sm">Metni stüdyoda düzenle</LinkButton>
+      </div>
+    );
   }
-  return <LegacyResultCard row={row} headline={headline} />;
+  return <LegacyResultCard row={row} headline={headline} textEditHref={textEditHref} />;
 }
 
-function LegacyResultCard({ row, headline }: { row: GeneratedRow; headline?: string }) {
+function LegacyResultCard({ row, headline, textEditHref }: { row: GeneratedRow; headline?: string; textEditHref: string }) {
   const [tab, setTab] = useState<BlockId>("post_text");
   const block = BLOCKS.find((b) => b.id === tab) ?? BLOCKS[0];
   const value = block.get(row);
@@ -142,6 +154,9 @@ function LegacyResultCard({ row, headline }: { row: GeneratedRow; headline?: str
             <CopyButton text={value} label={`${block.label} metnini kopyala`} />
             <LinkButton href={contentsHref({ contentId: row.id })} variant="secondary" size="sm">
               İçeriği düzenle
+            </LinkButton>
+            <LinkButton href={textEditHref} variant="soft" size="sm">
+              Metni stüdyoda düzenle
             </LinkButton>
             <LinkButton href={studioHref({ step: "gorsel", contentId: row.id })} variant="primary" size="sm">
               <IconImage className="h-3.5 w-3.5" />

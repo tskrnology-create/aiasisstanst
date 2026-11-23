@@ -54,6 +54,8 @@
 - [ ] Takvim hedef hesabı boşaltıldığında eski platform değeri sessizce kalmaz; platform/hesap davranışı açık ve tutarlıdır.
 
 ### İçerik yaşam döngüsü
+- [x] Kullanıcı Stüdyo'da kendi metnini AI kullanmadan sıfırdan yazıp aktif markaya taslak olarak kaydedebilir; yapay zekâ ile oluşturma akışı da marka bağlamıyla kullanılabilir.
+- [x] AI çıktısı doğrudan aynı içerik kimliğini koruyan Stüdyo metin düzenleyicisinde açılabilir; metin/hashtag değişikliği yeni kayıt oluşturmaz, kütüphane de tüm alanlar için düzenleme seçeneği sunar.
 - [x] Üretim sonucu düzenlenebilir veya kütüphanedeki aynı kayda belirgin bağlantı taşır; kullanıcı düzenlenmiş sürümü yanlışlıkla başka kayda kopyalamaz.
 - [x] Stüdyoda içerik seçiliyken görsel kaydı `contentId`'yi korur ve aynı markaya ait mevcut kaydı günceller; içerik seçilmemişse yeni taslak açar.
 - [ ] İçerik ID/marka bağlamı, üretimden görsel stüdyosuna ve takvime geçerken tüm rotalarda korunur; ilişkisiz ikinci kayıt izlenimi oluşturmaz.

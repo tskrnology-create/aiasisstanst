@@ -88,16 +88,54 @@ function Pills({ items }: { items: Array<{ href: string; label: string; active: 
   );
 }
 
-/** Kendi yazdığı metni kütüphaneye ekler (yapay zekâ kullanmadan). */
-function OwnText() {
+/** Kullanıcının metnini yeni taslak olarak kaydeder veya aynı içerik kaydını günceller. */
+function OwnText({ contentId }: { contentId: string | null }) {
   const { activeBusinessId } = useBusinessContext();
   const [text, setText] = useState("");
   const [tags, setTags] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(contentId);
+  const [loadingContent, setLoadingContent] = useState(Boolean(contentId));
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!contentId) return () => { active = false; };
+    if (!activeBusinessId) {
+      void Promise.resolve().then(() => {
+        if (!active) return;
+        setLoadError("İçeriği düzenlemek için önce ilgili markayı seçin.");
+        setLoadingContent(false);
+      });
+      return () => { active = false; };
+    }
+
+    void Promise.resolve(getSupabase().from("contents").select("id, post_text, hashtags")
+      .eq("id", contentId)
+      .eq("business_id", activeBusinessId)
+      .maybeSingle())
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error || !data) {
+          setLoadError("İçerik bulunamadı veya seçili markaya ait değil.");
+          setSavedId(null);
+          return;
+        }
+        setText(data.post_text ?? "");
+        setTags((data.hashtags ?? []).join(" "));
+      })
+      .catch(() => {
+        if (active) setLoadError("İçerik yüklenemedi. Yeniden deneyin.");
+      })
+      .finally(() => {
+        if (active) setLoadingContent(false);
+      });
+    return () => { active = false; };
+  }, [activeBusinessId, contentId]);
 
   async function save() {
-    if (!activeBusinessId || busy) return;
+    if (!activeBusinessId || busy || loadingContent || loadError) return;
     const body = text.trim();
     if (body.length < 3) {
       setMsg({ ok: false, text: "Önce metni yazın." });
@@ -106,21 +144,34 @@ function OwnText() {
     setBusy(true);
     setMsg(null);
     try {
-      const biz = await businessStore.get(activeBusinessId);
-      if (!biz) throw new Error("Marka bulunamadı.");
       const hashtags = [...new Set(tags.split(/[\s,]+/).filter(Boolean).map((t) => (t.startsWith("#") ? t : `#${t}`).slice(0, 60)))].slice(0, 30);
-      const { error } = await getSupabase().from("contents").insert({
-        business_id: activeBusinessId,
-        prompt: "Kendi metnim",
-        language: biz.content_language,
-        post_text: body,
-        hashtags,
-        status: "draft",
-      });
-      if (error) throw new Error(error.message);
-      setText("");
-      setTags("");
-      setMsg({ ok: true, text: "Metin kütüphaneye taslak olarak eklendi." });
+      const supabase = getSupabase();
+      const targetId = savedId ?? contentId;
+      if (targetId) {
+        const { data, error } = await supabase.from("contents")
+          .update({ post_text: body, hashtags })
+          .eq("id", targetId)
+          .eq("business_id", activeBusinessId)
+          .select("id")
+          .maybeSingle();
+        if (error || !data) throw new Error(error?.message ?? "İçerik bulunamadı.");
+        setSavedId(data.id);
+        setMsg({ ok: true, text: "Değişiklikler aynı içerik kaydına kaydedildi." });
+      } else {
+        const biz = await businessStore.get(activeBusinessId);
+        if (!biz) throw new Error("Marka bulunamadı.");
+        const { data, error } = await supabase.from("contents").insert({
+          business_id: activeBusinessId,
+          prompt: "Kendi metnim",
+          language: biz.content_language,
+          post_text: body,
+          hashtags,
+          status: "draft",
+        }).select("id").single();
+        if (error || !data) throw new Error(error?.message ?? "İçerik kaydedilemedi.");
+        setSavedId(data.id);
+        setMsg({ ok: true, text: "Metin taslak olarak kaydedildi." });
+      }
     } catch (err) {
       setMsg({ ok: false, text: err instanceof Error ? err.message : "Kaydedilemedi." });
     } finally {
@@ -129,8 +180,15 @@ function OwnText() {
   }
 
   return (
-    <SectionCard title="Kendi metnim" description="Yapay zekâ kullanmadan kendi yazdığınız metni kaydedin; sonra planlayın.">
+    <SectionCard
+      title={contentId || savedId ? "İçeriği düzenle" : "Kendi metnim"}
+      description={contentId || savedId
+        ? "Metni ve hashtag'leri düzenleyin; kaydettiğinizde aynı içerik kaydı güncellenir."
+        : "Yapay zekâ kullanmadan kendi metninizi yazıp taslak olarak kaydedin; daha sonra düzenleyip planlayabilirsiniz."}
+    >
       <div className="space-y-3">
+        {loadingContent && <Callout tone="info">İçerik yükleniyor…</Callout>}
+        {loadError && <Callout tone="error">{loadError}</Callout>}
         <label className="block space-y-1.5">
           <span className="text-sm font-medium text-ink">Gönderi metni</span>
           <textarea className={cx(inputClass, "min-h-40 resize-y")} rows={7} maxLength={2200} value={text} onChange={(e) => setText(e.target.value)} placeholder="Paylaşım metnini buraya yazın…" />
@@ -142,12 +200,12 @@ function OwnText() {
         </label>
         {msg && (
           <Callout tone={msg.ok ? "success" : "error"}>
-            {msg.text} {msg.ok && <Link href={contentsHref()} className="font-semibold underline">İçeriklere git →</Link>}
+            {msg.text} {msg.ok && savedId && <Link href={contentsHref({ contentId: savedId })} className="font-semibold underline">Bu içeriği aç →</Link>}
           </Callout>
         )}
-        <Button type="button" onClick={save} disabled={busy || !activeBusinessId}>
+        <Button type="button" onClick={save} disabled={busy || loadingContent || Boolean(loadError) || !activeBusinessId}>
           <IconLibrary />
-          {busy ? "Kaydediliyor…" : "Kütüphaneye ekle"}
+          {busy ? "Kaydediliyor…" : contentId || savedId ? "Değişiklikleri kaydet" : "Taslak olarak kaydet"}
         </Button>
       </div>
     </SectionCard>
@@ -157,7 +215,9 @@ function OwnText() {
 /** Yalnız metin: şablon yok. Yapay zekâyla yaz ya da kendi metnini ekle. */
 export function TextStudio() {
   const params = useSearchParams();
+  const { activeBusinessId } = useBusinessContext();
   const own = params.get("adim") === "kendi";
+  const contentId = params.get("content");
   return (
     <div className="space-y-5">
       <BackToHub label="Metin" />
@@ -167,7 +227,9 @@ export function TextStudio() {
           { href: modeHref("metin", { step: "kendi" }), label: "Kendi metnim", active: own },
         ]}
       />
-      {own ? <OwnText /> : <Generator mode="metin" />}
+      {own
+        ? <OwnText key={`${activeBusinessId ?? "no-brand"}:${contentId ?? "new"}`} contentId={contentId} />
+        : <Generator mode="metin" />}
     </div>
   );
 }
