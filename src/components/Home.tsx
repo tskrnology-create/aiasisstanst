@@ -40,6 +40,7 @@ export default function Home() {
   const failed = Boolean(businessId && failedBusinessId === businessId);
   const strip = useMemo(() => weekStrip(currentData?.weekIsos ?? [], now), [currentData, now]);
   const specialDays = useMemo(() => upcomingSpecialDays(now, 30, 3), [now]);
+  const focus = currentData?.upcoming.find((i) => new Date(i.scheduled_at).getTime() >= now.getTime()) ?? null;
   const next = currentData
     ? nextAction({
         overdue: currentData.overdue,
@@ -73,27 +74,51 @@ export default function Home() {
         </div>
       )}
 
-      {next && (
-        <Link
-          href={next.href}
-          className={cx("block rounded-2xl border p-4 transition hover:-translate-y-0.5", next.tone === "warn" ? "border-warn/30 bg-warn-soft" : "border-brand/25 bg-brand-soft")}
-        >
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-faint">Sıradaki adım</p>
-          <p className="mt-1 text-sm font-semibold text-ink">{next.title}</p>
+      {next && next.id === "overdue" && (
+        <Link href={next.href} className="block rounded-2xl border border-warn/30 bg-warn-soft p-4">
+          <p className="text-sm font-semibold text-ink">{next.title}</p>
           <p className="mt-0.5 text-xs text-muted">{next.description}</p>
-          <p className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand">
-            {next.cta} <IconArrowRight className="h-3.5 w-3.5" />
-          </p>
         </Link>
       )}
 
-      <Link href="/olustur" className="flex items-center justify-between rounded-2xl border border-line bg-surface p-4 shadow-soft transition hover:border-brand">
-        <span>
-          <span className="block text-sm font-bold text-ink">Şimdi bir şey oluştur</span>
-          <span className="block text-xs text-muted">Fikrini yaz; yazı ve kapak görseli birlikte hazırlansın.</span>
-        </span>
-        <IconArrowRight className="h-5 w-5 text-brand" />
-      </Link>
+      {currentData && (
+        <section aria-label="Sıradaki paylaşım" className="space-y-4 rounded-3xl bg-brand p-5 text-brand-ink">
+          <ol className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em]">
+            {[
+              ["Planla", currentData.upcoming.length > 0],
+              ["Hazırla", Boolean(focus?.ready)],
+              ["Paylaş", false],
+            ].map(([label, done], i) => (
+              <li key={label as string} className={cx("flex items-center gap-1.5", done ? "opacity-100" : "opacity-60")}>
+                <span className="grid h-5 w-5 place-items-center rounded-full bg-brand-ink text-[10px] text-brand">{done ? "✓" : i + 1}</span>
+                {label as string}
+              </li>
+            ))}
+          </ol>
+          {focus ? (
+            <>
+              <div>
+                <p className="text-xs opacity-80">{new Date(focus.scheduled_at).toLocaleString("tr-TR", { weekday: "long", hour: "2-digit", minute: "2-digit" })}{focus.platform ? ` · ${focus.platform}` : ""}</p>
+                <p className="mt-1 text-lg font-bold leading-snug">{focus.ready ? focus.text : focus.prompt}</p>
+              </div>
+              <Link
+                href={focus.ready ? "/hafta" : `/olustur?prompt=${encodeURIComponent(focus.prompt.slice(0, 500))}&slot=${focus.contentId}${focus.platform ? `&platform=${focus.platform}` : ""}`}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-ink px-4 py-3 text-sm font-bold text-brand"
+              >
+                {focus.ready ? "Paylaşmaya git" : "Hazırla"} <IconArrowRight className="h-4 w-4" />
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-bold leading-snug">Önümüzdeki günler için plan yok. Tek tıkla haftanı planlayalım.</p>
+              <Link href="/hafta" className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-ink px-4 py-3 text-sm font-bold text-brand">
+                Haftayı planla <IconArrowRight className="h-4 w-4" />
+              </Link>
+            </>
+          )}
+          <Link href="/olustur" className="block text-center text-xs font-semibold underline underline-offset-2 opacity-90">Ya da kendi fikrinle başla</Link>
+        </section>
+      )}
 
       <section aria-label="Bu hafta" className="space-y-2.5">
         <div className="flex items-center justify-between">
