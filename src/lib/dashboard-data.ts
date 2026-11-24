@@ -3,6 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import { businessStore, type StoredBusiness } from "@/lib/business-store";
 import type { ContentStatus } from "@/lib/library-utils";
 import { snippet } from "@/lib/dashboard-utils";
+import { computeInsights, type Insights } from "@/lib/performance";
 
 export interface UpcomingItem {
   id: string;
@@ -34,6 +35,7 @@ export interface DashboardData {
   planned: number;
   overdue: number;
   postedThisMonth: number;
+  insights: Insights;
   upcoming: UpcomingItem[];
   weekIsos: string[];
   recent: RecentContent[];
@@ -103,8 +105,30 @@ export async function loadDashboard(businessId: string): Promise<DashboardData> 
     };
   });
 
+  // Sonuç sütunları (schema v10) yoksa panel yine açılır; içgörü boş kalır.
+  const resultRows = await sb
+    .from("calendar_items")
+    .select("platform, posted_at, result_likes, result_comments, result_saves")
+    .eq("business_id", businessId)
+    .eq("done", true)
+    .not("posted_at", "is", null)
+    .order("posted_at", { ascending: false })
+    .limit(60);
+  const insights = computeInsights(
+    resultRows.error
+      ? []
+      : (resultRows.data ?? []).map((r) => ({
+          platform: r.platform as string | null,
+          postedAt: r.posted_at as string,
+          likes: r.result_likes as number | null,
+          comments: r.result_comments as number | null,
+          saves: r.result_saves as number | null,
+        }))
+  );
+
   return {
     business,
+    insights,
     total: total.count ?? 0,
     drafts: drafts.count ?? 0,
     approved: approved.count ?? 0,

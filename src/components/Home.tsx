@@ -110,6 +110,24 @@ export default function Home() {
         </div>
       </section>
 
+      {currentData && (
+        <section aria-label="Neler işe yarıyor" className="rounded-2xl border border-line bg-surface p-4">
+          <h2 className="text-sm font-bold text-ink">Neler işe yarıyor?</h2>
+          {currentData.insights.bestPlatform ? (
+            <p className="mt-1 text-sm text-muted">
+              En çok etkileşim <b className="text-ink">{currentData.insights.bestPlatform.name}</b>
+              {currentData.insights.bestDayPart && <> ve <b className="text-ink">{currentData.insights.bestDayPart.name}</b> saatlerinde</>} geldi
+              ({currentData.insights.count} gönderiye göre).
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-muted">
+              Paylaştığın gönderilerin beğeni, yorum ve kaydetme sayısını Hafta ekranında girersen en iyi platformu ve saati burada gösteririz
+              (en az 3 sonuç gerekir, şu an {currentData.insights.count}).
+            </p>
+          )}
+        </section>
+      )}
+
       {specialDays.length > 0 && (
         <section aria-label="Yaklaşan özel günler" className="space-y-2.5">
           <h2 className="text-sm font-bold text-ink">Yaklaşan özel günler</h2>

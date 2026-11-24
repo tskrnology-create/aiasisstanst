@@ -29,7 +29,7 @@ Küçük işletmeler ve bireysel içerik üreticileri sosyal medyayı **düzenli
 | US-10 | Should | Gelen yorum/DM'e marka sesiyle yanıt almak istiyorum | 3 seçenek; talimat enjeksiyonuna dayanıklı; fiyat/taahhüt uydurulmaz |
 | US-11 | Should | Müzik eklemek istiyorum | Her stüdyoda isteğe bağlı: öneri tarzı veya kendi dosyam; telif uyarısı |
 | US-12 | Should | Markamı bilen bir asistanla konuşmak istiyorum | Balon aç/kapat; yalnızca herkese açık profil bilgisi kullanılır |
-| US-13 | Could | Performansı görmek istiyorum | (Yol haritası) paylaşım sonrası beğeni/erişim girişi, en iyi saat |
+| US-13 | Could | Performansı görmek istiyorum | Yapıldı: paylaşım sonrası beğeni/yorum/kaydetme girişi, en iyi platform ve gün dilimi özeti. Erişim ve haftalık özet sırada |
 | US-14 | Won't | Otomatik yayın | Kapsam dışı |
 
 ## 1.4 Fonksiyonel olmayan gereksinimler

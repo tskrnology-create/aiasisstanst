@@ -11,6 +11,7 @@ import { addDays, dayKey, normalizePostUrl, startOfDay } from "@/lib/calendar-ut
 import { postApi } from "@/lib/api-client";
 import { PLAN_SLOTS, type PlanItem } from "@/lib/plan-prompt";
 import { businessStore } from "@/lib/business-store";
+import { parseCount } from "@/lib/performance";
 import { useBusinessContext } from "./BusinessContext";
 import { Button, Callout, Chip, EmptyState, LinkButton, SectionCard, Tag, cx } from "./Ui";
 import { IconCheck, IconPlus, IconSparkles } from "./Icons";
@@ -24,6 +25,9 @@ export default function Week() {
   const [selected, setSelected] = useState(0);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [postUrl, setPostUrl] = useState("");
+  const [likes, setLikes] = useState("");
+  const [comments, setComments] = useState("");
+  const [saves, setSaves] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [now] = useState(() => new Date());
   const requestSequence = useRef(0);
@@ -131,10 +135,15 @@ export default function Week() {
       setError("Gönderi bağlantısı http:// veya https:// ile başlamalıdır.");
       return;
     }
+    const counts = [parseCount(likes), parseCount(comments), parseCount(saves)];
+    if (counts.some((c) => c === undefined)) {
+      setError("Beğeni, yorum ve kaydetme sayıları yalnızca rakam olmalı.");
+      return;
+    }
     if (!businessId) return;
     setSavingId(id);
     const { error: err } = await getSupabase().from("calendar_items")
-      .update({ done: true, posted_at: new Date().toISOString(), post_url: normalizedUrl })
+      .update({ done: true, posted_at: new Date().toISOString(), post_url: normalizedUrl, result_likes: counts[0], result_comments: counts[1], result_saves: counts[2] })
       .eq("id", id)
       .eq("business_id", businessId);
     setSavingId(null);
@@ -142,6 +151,7 @@ export default function Week() {
     else {
       setConfirmingId(null);
       setPostUrl("");
+      setLikes(""); setComments(""); setSaves("");
       void load();
     }
   }
@@ -271,6 +281,17 @@ export default function Week() {
                   <span>Gönderi bağlantısı (isteğe bağlı)</span>
                   <input type="url" value={postUrl} onChange={(event) => setPostUrl(event.target.value)} placeholder="https://…" className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink" />
                 </label>
+                <fieldset className="space-y-1 text-xs text-muted">
+                  <legend>Sonuç (isteğe bağlı, birkaç gün sonra da girilebilir)</legend>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([["Beğeni", likes, setLikes], ["Yorum", comments, setComments], ["Kaydetme", saves, setSaves]] as const).map(([label, value, set]) => (
+                      <label key={label} className="space-y-1">
+                        <span>{label}</span>
+                        <input inputMode="numeric" value={value} onChange={(event) => set(event.target.value)} className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink" />
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
                 <div className="flex gap-2">
                   <Button type="submit" size="sm" disabled={savingId === item.id}>{savingId === item.id ? "Kaydediliyor…" : "Manuel paylaşımı kaydet"}</Button>
                   <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmingId(null)}>Vazgeç</Button>
