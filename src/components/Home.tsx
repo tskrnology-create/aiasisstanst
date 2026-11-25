@@ -9,6 +9,7 @@ import { greeting, nextAction, weekStrip } from "@/lib/dashboard-utils";
 import { upcomingSpecialDays } from "@/lib/special-days";
 import { contentsHref } from "@/lib/routes";
 import { useBusinessContext } from "./BusinessContext";
+import { useConnectedPlatforms } from "./useConnectedPlatforms";
 import { IconArrowRight } from "./Icons";
 import { cx } from "./Ui";
 
@@ -18,6 +19,7 @@ export default function Home() {
   const [failedBusinessId, setFailedBusinessId] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [now] = useState(() => new Date());
+  const connected = useConnectedPlatforms(businessId);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,6 +73,13 @@ export default function Home() {
           <p>İş özeti yüklenemedi. İçeriklerin silinmedi; bağlantıyı kontrol edip yeniden deneyebilirsin.</p>
           <button type="button" onClick={() => setVersion((v) => v + 1)} className="mt-2 font-semibold underline underline-offset-2">Yeniden dene</button>
         </div>
+      )}
+
+      {currentData && !connected && (
+        <Link href="/marka" className="block rounded-2xl border border-brand/25 bg-brand-soft p-4 text-sm">
+          <span className="block font-semibold text-ink">Önce sosyal medya hesaplarını ekle</span>
+          <span className="mt-0.5 block text-xs text-muted">İçerikler, eklediğin platformların kurallarına göre hazırlanır ve oralara paylaşılır.</span>
+        </Link>
       )}
 
       {next && (

@@ -27,6 +27,7 @@ import {
   inputClass,
 } from "./Ui";
 import { CopyButton, OpenPlatformButton, PlatformPicker } from "./ShareControls";
+import { useConnectedPlatforms } from "./useConnectedPlatforms";
 import ModelViewer from "./ModelViewer";
 import {
   IconArrowRight,
@@ -124,7 +125,10 @@ function ItemCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [platform, setPlatform] = useState<SocialPlatform | null>(null);
+  const { activeBusinessId: ownBusinessId } = useBusinessContext();
+  const connected = useConnectedPlatforms(ownBusinessId);
+  const [pickedPlatform, setPlatform] = useState<SocialPlatform | null>(null);
+  const platform = pickedPlatform ?? connected?.[0] ?? null;
   const [postText, setPostText] = useState(row.post_text ?? "");
   const [caption, setCaption] = useState(row.caption ?? "");
   const [hashtags, setHashtags] = useState(row.hashtags.join(" "));
@@ -342,7 +346,7 @@ function ItemCard({
               </p>
               <span className={hintClass}>Paylaşım metni: açıklama + hashtag</span>
             </div>
-            <PlatformPicker value={platform} onChange={setPlatform} />
+            <PlatformPicker value={platform} onChange={setPlatform} only={connected} />
             <div className="flex flex-wrap items-center gap-2">
               <CopyButton text={shareText(currentRow)} label="Paylaşım metnini kopyala" />
               <OpenPlatformButton platform={platform} />

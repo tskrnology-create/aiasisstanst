@@ -265,7 +265,7 @@ function ProfileFormWorkspace({
       <SectionCard
         step="03"
         title="Sosyal medya hesapları"
-        description="Şimdilik yalnızca kayıt ve paylaşım hatırlatması için; platformlara bağlantı ve otomatik gönderim bu sürümde yok."
+        description="Paylaşacağın tüm platformları ekle. İçerikler bu platformların kurallarına göre hazırlanır ve yalnızca bunlara paylaşılır. Otomatik gönderim henüz yok; paylaşırken platformun kendi ekranı açılır."
         aside={<Tag>{form.social_accounts.length} hesap</Tag>}
       >
         <div className="space-y-2.5">

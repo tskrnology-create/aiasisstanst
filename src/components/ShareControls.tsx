@@ -71,14 +71,17 @@ export function PlatformPicker({
   value,
   onChange,
   className,
+  only,
 }: {
   value: SocialPlatform | null;
   onChange: (platform: SocialPlatform) => void;
   className?: string;
+  /** Verilirse yalnızca bu platformlar gösterilir (işletmenin eklediği hesaplar). */
+  only?: SocialPlatform[] | null;
 }) {
   return (
     <div className={cx("flex flex-wrap gap-1.5", className)} role="group" aria-label="Paylaşım platformu">
-      {ALL_SHARE_TARGETS.map((target) => {
+      {ALL_SHARE_TARGETS.filter((t) => !only || only.includes(t.platform)).map((target) => {
         const active = value === target.platform;
         return (
           <button

@@ -15,11 +15,12 @@ import { FORMATS, TEMPLATES, drawVisual, templateWantsPhoto, DEFAULT_PHOTO_TEMPL
 import { studioHref } from "@/lib/routes";
 import type { ContentIdea } from "@/lib/brand-prompt";
 import { useBusinessContext } from "./BusinessContext";
+import { useConnectedPlatforms } from "./useConnectedPlatforms";
 import { PackageEditor, type GeneratedRow } from "./PackageView";
 import MusicPicker from "./MusicPicker";
 import { CopyButton } from "./ShareControls";
 import { Button, Callout, Chip, cx } from "./Ui";
-import { IconCalendar, IconImage, IconSend, IconSparkles } from "./Icons";
+import { IconCalendar, IconCheck, IconImage, IconSend, IconSparkles } from "./Icons";
 
 const MAX_BRIEF = 500;
 
@@ -30,9 +31,10 @@ function canvasBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 export default function Create() {
   const { activeBusinessId: businessId } = useBusinessContext();
   const params = useSearchParams();
+  const connected = useConnectedPlatforms(businessId);
   const [biz, setBiz] = useState<StoredBusiness | null>(null);
   const [kindId, setKindId] = useState<PostFormat>("gonderi");
-  const [platform, setPlatform] = useState<PlatformId>(() => {
+  const [pickedPlatform, setPlatform] = useState<PlatformId>(() => {
     const p = params.get("platform");
     return isPlatformId(p) ? p : "instagram";
   });
@@ -50,12 +52,17 @@ export default function Create() {
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
   const [savedVisual, setSavedVisual] = useState(false);
   const [showPlan, setShowPlan] = useState(false);
+  // Kapak ayrıntıları: yalnız ait olduğu içerik için geçerli (rowId eşleşmezse yok sayılır).
+  const [coverEdit, setCoverEdit] = useState<{ rowId: string; headline?: string; subline?: string; scale: number; align: "left" | "center" | "right"; color?: string } | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [planned, setPlanned] = useState<string | null>(null);
   const [now] = useState(() => new Date());
   const [dayKey, setDayKey] = useState(() => dayOptions(new Date(), 7)[0].key);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const days = useMemo(() => dayOptions(now, 7), [now]);
 
+  const platform: PlatformId =
+    !connected || connected.includes(pickedPlatform) ? pickedPlatform : (PLATFORMS.find((p) => connected.includes(p.id))?.id ?? pickedPlatform);
   const kind = kindOf(kindId);
   const pkg = row?.package ?? null;
   const allowed = formatsForPlatform(platform);
@@ -88,8 +95,14 @@ export default function Create() {
     canvas.height = f.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const { headline, subline } = coverText(pkg);
+    const base = coverText(pkg);
+    const ce = coverEdit && row && coverEdit.rowId === row.id ? coverEdit : null;
+    const headline = ce?.headline ?? base.headline;
+    const subline = ce?.subline ?? base.subline;
     drawVisual(ctx, {
+      textScale: ce?.scale,
+      textAlign: ce?.align,
+      textColor: ce?.color,
       width: f.width,
       height: f.height,
       template,
@@ -102,7 +115,7 @@ export default function Create() {
       background: photo,
       backgroundSize: photo ? { w: photo.naturalWidth, h: photo.naturalHeight } : undefined,
     });
-  }, [pkg, kind.cover, template, photo, logo, biz]);
+  }, [pkg, kind.cover, template, photo, logo, biz, coverEdit, row]);
 
   function pickKind(id: PostFormat) {
     setKindId(id);
@@ -203,6 +216,13 @@ export default function Create() {
     setSavedVisual(true);
   }, [kind.cover, row, businessId, pkg, savedVisual, brief]);
 
+  async function saveContent() {
+    if (!row || !businessId) return;
+    const { error: err } = await getSupabase().from("contents").update({ status: "approved" }).eq("id", row.id).eq("business_id", businessId);
+    if (err) setError("Kaydedilemedi. Tekrar deneyin.");
+    else { setError(null); setSavedId(row.id); }
+  }
+
   async function share() {
     if (!pkg) return;
     setError(null);
@@ -293,7 +313,7 @@ export default function Create() {
           className="w-full resize-none rounded-2xl border-0 bg-surface-2 px-3.5 py-3 text-sm text-ink placeholder:text-faint focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         />
         <div className="no-scrollbar flex gap-1.5 overflow-x-auto" role="group" aria-label="Platform">
-          {PLATFORMS.map((p) => (
+          {PLATFORMS.filter((p) => !connected || connected.includes(p.id)).map((p) => (
             <Chip key={p.id} active={platform === p.id} onClick={() => pickPlatform(p.id)} className="shrink-0 py-1 text-xs">
               {p.label}
             </Chip>
@@ -404,7 +424,48 @@ export default function Create() {
             </div>
           )}
 
+          {kind.cover && row && (
+            <fieldset className="space-y-2.5 rounded-2xl border border-line bg-surface p-3.5">
+              <legend className="px-1 text-xs font-bold uppercase tracking-wide text-muted">Kapak ayrıntıları</legend>
+              {(() => {
+                const ce = coverEdit?.rowId === row.id ? coverEdit : { rowId: row.id, scale: 1, align: "center" as const };
+                const base = pkg ? coverText(pkg) : { headline: "", subline: "" };
+                const set = (patch: Partial<typeof ce>) => { setCoverEdit({ ...ce, ...patch }); setSavedVisual(false); };
+                const colors = [...(biz?.brand_colors ?? []), "#ffffff", "#111111"];
+                return (
+                  <>
+                    <label className="block space-y-1 text-xs text-muted">
+                      <span>Kapak başlığı</span>
+                      <input id="cover-headline" value={ce.headline ?? base.headline} maxLength={90} onChange={(e) => set({ headline: e.target.value })} className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm text-ink" />
+                    </label>
+                    <label className="block space-y-1 text-xs text-muted">
+                      <span>Alt yazı</span>
+                      <input id="cover-subline" value={ce.subline ?? base.subline} maxLength={110} onChange={(e) => set({ subline: e.target.value })} className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm text-ink" />
+                    </label>
+                    <label className="block space-y-1 text-xs text-muted">
+                      <span>Yazı boyutu</span>
+                      <input id="cover-scale" type="range" min={0.7} max={1.4} step={0.05} value={ce.scale} onChange={(e) => set({ scale: Number(e.target.value) })} className="w-full" />
+                    </label>
+                    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Yazı hizası">
+                      {(["left", "center", "right"] as const).map((a) => (
+                        <Chip key={a} active={ce.align === a} onClick={() => set({ align: a })} className="py-1 text-xs">{a === "left" ? "Sol" : a === "center" ? "Orta" : "Sağ"}</Chip>
+                      ))}
+                      <span className="mx-1 text-xs text-muted">Renk</span>
+                      {colors.map((c) => (
+                        <button key={c} type="button" aria-label={`Yazı rengi ${c}`} aria-pressed={ce.color === c} onClick={() => set({ color: c })} className={cx("h-6 w-6 rounded-full border-2", ce.color === c ? "border-brand" : "border-line")} style={{ background: c }} />
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
+            </fieldset>
+          )}
+
           <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => void saveContent()} variant={savedId === row.id ? "soft" : "secondary"}>
+              <IconCheck className="h-4 w-4" />
+              {savedId === row.id ? "Kaydedildi" : "Kaydet"}
+            </Button>
             <Button type="button" onClick={share} className="flex-1">
               <IconSend className="h-4 w-4" />
               Paylaş

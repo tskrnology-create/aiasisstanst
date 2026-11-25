@@ -41,3 +41,16 @@ Tek kişi ya da küçük işletme, telefondan. Akış: **Marka sesi kur (bir kez
 - Yapıldı: şema v11, istemlere sütun ve ses örneği (`brand-prompt.ts`, etiket temizliği ve test), `getBusinessById` ile yükleme (tablolar yoksa üretim sürer), Marka sayfasında `VoicePanel`.
 - Ertelendi: `ai_assisted` sütunu veritabanında var ama arayüz yazmıyor. v11 uygulanmadan yazarsak eklemeler hata verir; v11 uygulandıktan sonra açılacak.
 - Doğrulanmadı: iki hesapla RLS testi ve ekran görüntüsü kontrolü.
+
+## 7. Ürün tanımı (kullanıcıdan, 2026-11-25) ve karşılığı
+Akış: işletme kayıt olur ve tüm platformlarını ekler → kendisi ya da yapay zeka platform niteliklerine göre içerik üretir → önizlemede en ince ayrıntıya kadar düzenler → Kaydet ile hafızaya alınır → İçeriklerim'de Paylaş ile istediği platforma paylaşır → her adımda yapay zeka asistan.
+
+| Adım | Durum |
+|---|---|
+| Kayıtta platform ekleme | Marka formunun 3. bölümü; Ana sayfa hesap yoksa önce bunu ister |
+| Platforma göre üretim | Platform kuralları (`platform-playbook.ts`); Oluştur ekranı yalnız eklenen platformları gösterir |
+| Önizlemede ayrıntılı düzenleme | Metin alanları, şablon, fotoğraf, kapak başlığı/alt yazı/boyut/hiza/renk; yeniden üretime dönmeden |
+| Kaydet | Oluştur'da "Kaydet" (içerik onaylı olarak saklanır) |
+| İçeriklerim'de paylaş | Platform seçici yalnız eklenen platformları gösterir |
+| Asistan | Sağ alttaki balon (var); adım içi öneriler sonraki iş |
+| Otomatik paylaşım | Hâlâ yok: Meta/TikTok incelemesi gerekir |
