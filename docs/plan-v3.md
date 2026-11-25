@@ -36,3 +36,8 @@ Tek kişi ya da küçük işletme, telefondan. Akış: **Marka sesi kur (bir kez
 3. Her yeni birim davranışı için test var; tip, lint, test, derleme temiz.
 4. Başka kullanıcının satırı okunamaz (SQL ile iki hesap testi: kullanıcıya bırakılır).
 5. Mevcut akışlar bozulmaz.
+
+## 6. Uygulama durumu (Faz 1)
+- Yapıldı: şema v11, istemlere sütun ve ses örneği (`brand-prompt.ts`, etiket temizliği ve test), `getBusinessById` ile yükleme (tablolar yoksa üretim sürer), Marka sayfasında `VoicePanel`.
+- Ertelendi: `ai_assisted` sütunu veritabanında var ama arayüz yazmıyor. v11 uygulanmadan yazarsak eklemeler hata verir; v11 uygulandıktan sonra açılacak.
+- Doğrulanmadı: iki hesapla RLS testi ve ekran görüntüsü kontrolü.

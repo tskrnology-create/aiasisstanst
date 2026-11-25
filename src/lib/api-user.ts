@@ -52,7 +52,20 @@ export async function getBusinessById(supabase: SupabaseClient, businessId: unkn
     .select("id, name, industry, products, target_audience, brand_voice, brand_colors, primary_share, content_language")
     .eq("id", businessId)
     .maybeSingle();
-  return { business: data, error };
+  if (error || !data) return { business: data, error };
+  // Sütun ve ses örnekleri (schema v11). Tablolar henüz yoksa üretim bunlarsız sürer.
+  const [pillars, samples] = await Promise.all([
+    supabase.from("content_pillars").select("name, description").eq("business_id", businessId).order("position").limit(6),
+    supabase.from("voice_samples").select("body").eq("business_id", businessId).order("created_at").limit(5),
+  ]);
+  return {
+    business: {
+      ...data,
+      pillars: pillars.error ? [] : (pillars.data ?? []),
+      voice_samples: samples.error ? [] : (samples.data ?? []).map((r) => r.body as string),
+    },
+    error: null,
+  };
 }
 
 // --- Özel depo (visuals) işlemleri: kullanıcının oturum belirteciyle doğrudan Storage REST'e gider. ---

@@ -1,6 +1,7 @@
 import AuthGate from "@/components/AuthGate";
 import PageHeader from "@/components/PageHeader";
 import ProfileForm from "@/components/ProfileForm";
+import VoicePanel from "@/components/VoicePanel";
 import { Tag } from "@/components/Ui";
 import { IconCheck } from "@/components/Icons";
 
@@ -21,7 +22,10 @@ export default function BrandPage() {
         }
       />
       <AuthGate>
-        <ProfileForm />
+        <div className="space-y-6">
+          <ProfileForm />
+          <VoicePanel />
+        </div>
       </AuthGate>
     </>
   );
